@@ -27,7 +27,7 @@ export default function TahfidzGroups() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-emerald-600">Tahfidz</p>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Kelompok Tahfidz</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Kelompok Tahfidz</h1>
           <p className="mt-1 text-slate-500">
             {isAdmin
               ? 'Kelola kelompok halaqah dan keanggotaannya.'

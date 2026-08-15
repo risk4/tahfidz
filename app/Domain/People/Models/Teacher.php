@@ -3,6 +3,7 @@
 namespace App\Domain\People\Models;
 
 use App\Domain\Academic\Models\ClassRoom;
+use App\Domain\People\Models\Student;
 use App\Domain\TahfidzGroup\Models\TahfidzGroup;
 use App\Domain\Tahfidz\Models\Murajaah;
 use App\Domain\Tahfidz\Models\Submission;
@@ -53,12 +54,20 @@ class Teacher extends Model
     }
 
     /**
-     * Cek apakah guru ini membina siswa tertentu (lewat kelompok tahfidz aktif).
+     * Cek apakah guru ini membina siswa tertentu.
+     *
+     * Guru dianggap membina siswa bila:
+     * - siswa terdaftar di kelas yang wali kelasnya guru ini (homeroom), ATAU
+     * - siswa tergabung dalam kelompok tahfidz binaan guru ini.
      */
     public function supervises(int $studentId): bool
     {
-        return $this->tahfidzGroups()
-            ->whereHas('members', fn ($q) => $q->where('students.id', $studentId))
+        return Student::query()
+            ->where('students.id', $studentId)
+            ->where(function ($q) {
+                $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $this->id))
+                    ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $this->id));
+            })
             ->exists();
     }
 }

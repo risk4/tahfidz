@@ -215,6 +215,7 @@ export interface Submission {
   end_ayah: number;
   page_count?: number | string | null;
   type: 'new_memorization' | 'repetition';
+  method?: 'setoran' | 'murojaah' | 'tasmi' | 'sambung_ayat';
   fluency_score: number;
   tajwid_score: number;
   makhraj_score: number;
@@ -265,7 +266,7 @@ export interface StudentProgressSummary {
   progress_percentage: number;
   average_score: number;
   last_submission_at?: string;
-  student?: Pick<Student, 'id' | 'name' | 'student_code' | 'class_id'>;
+  student?: Pick<Student, 'id' | 'name' | 'student_code' | 'class_id' | 'memorization_target' | 'starting_juz'>;
 }
 
 export interface SurahProgress {

@@ -23,6 +23,7 @@ class StoreSubmissionRequest extends FormRequest
             'end_ayah' => ['required', 'integer', 'min:1', 'gte:start_ayah'],
             'page_count' => ['nullable', 'numeric', 'min:0.1', 'max:999.9'],
             'type' => ['required', Rule::in(['new_memorization', 'repetition'])],
+            'method' => ['nullable', Rule::in(['setoran', 'murojaah', 'tasmi', 'sambung_ayat'])],
             'status' => ['nullable', Rule::in(['pending', 'approved', 'revision', 'rejected'])],
             'fluency_score' => ['required', 'integer', 'min:0', 'max:100'],
             'tajwid_score' => ['required', 'integer', 'min:0', 'max:100'],

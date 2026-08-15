@@ -714,11 +714,18 @@ class DashboardService
                 return [];
             }
 
-            return DB::table('tahfidz_group_members as tgm')
-                ->join('tahfidz_groups as tg', 'tg.id', '=', 'tgm.tahfidz_group_id')
-                ->where('tg.teacher_id', $teacherId)
+            // Murid binaan guru: murid di kelas yang ia wali (homeroom) ATAU
+            // murid dalam kelompok tahfidz binaannya.
+            return DB::table('students as st')
+                ->leftJoin('classes as c', 'c.id', '=', 'st.class_id')
+                ->leftJoin('tahfidz_group_members as tgm', 'tgm.student_id', '=', 'st.id')
+                ->leftJoin('tahfidz_groups as tg', 'tg.id', '=', 'tgm.tahfidz_group_id')
+                ->where(function ($q) use ($teacherId) {
+                    $q->where('c.homeroom_teacher_id', $teacherId)
+                        ->orWhere('tg.teacher_id', $teacherId);
+                })
                 ->distinct()
-                ->pluck('tgm.student_id')
+                ->pluck('st.id')
                 ->all();
         }
 

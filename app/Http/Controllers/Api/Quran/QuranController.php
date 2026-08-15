@@ -57,21 +57,17 @@ class QuranController extends Controller
 
         $query->orderBy('surah_number');
 
-        $ranges = $this->juzRanges();
-        $attachRanges = function ($surahs) use ($ranges) {
-            foreach ($surahs as $surah) {
-                $range = $ranges->get($surah->id);
-                $surah->juz_range = $range ? ['min' => (int) $range->min_juz, 'max' => (int) $range->max_juz] : null;
-            }
+        $respond = function ($surahs) {
+            QuranSurah::attachJuzRanges($surahs);
 
-            return $surahs;
+            return response()->json($surahs);
         };
 
         if ($request->has('per_page')) {
-            return response()->json($attachRanges($query->paginate($request->integer('per_page', 12))));
+            return $respond($query->paginate($request->integer('per_page', 12)));
         }
 
-        return response()->json($attachRanges($query->get()));
+        return $respond($query->get());
     }
 
     /**
@@ -98,24 +94,9 @@ class QuranController extends Controller
 
         $surah->load(['ayahs' => fn ($q) => $q->orderBy('ayah_number')->with('juz:id,juz_number')]);
 
-        $range = $this->juzRanges()->get($surah->id);
-        $surah->juz_range = $range ? ['min' => (int) $range->min_juz, 'max' => (int) $range->max_juz] : null;
+        QuranSurah::attachJuzRanges([$surah]);
 
         return response()->json($surah);
-    }
-
-    /**
-     * Rentang juz per surah, dihitung dari tabel ayat (satu query untuk semua surah).
-     */
-    private function juzRanges()
-    {
-        return QuranAyah::query()
-            ->join('quran_juz', 'quran_ayahs.juz_id', '=', 'quran_juz.id')
-            ->select('quran_ayahs.surah_id')
-            ->selectRaw('MIN(quran_juz.juz_number) as min_juz, MAX(quran_juz.juz_number) as max_juz')
-            ->groupBy('quran_ayahs.surah_id')
-            ->get()
-            ->keyBy('surah_id');
     }
 
     public function ayahs(Request $request, QuranSurah $surah)

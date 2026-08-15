@@ -238,7 +238,7 @@ export default function Quran() {
       {/* Page header */}
       <div>
         <p className="text-sm font-semibold text-emerald-600">Al-Qur'an</p>
-        <h1 className="text-3xl font-black tracking-tight text-slate-900">Surah & Ayat</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Surah & Ayat</h1>
         <p className="mt-1 text-slate-500">Kelola dan jelajahi referensi Al-Qur'an untuk program Tahfidz</p>
       </div>
 

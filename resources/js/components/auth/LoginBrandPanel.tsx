@@ -1,5 +1,8 @@
 import { BookOpen, ChartNoAxesCombined, ShieldCheck, Users } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { LoginFeature } from '@/components/auth/LoginFeature';
+import { settingsService } from '@/services/api';
+import type { AppSettings } from '@/types';
 
 const features = [
   { icon: Users, title: 'Kelola santri dengan mudah', description: 'Data santri, kelas, dan pembimbing terorganisir.' },
@@ -9,6 +12,20 @@ const features = [
 ];
 
 export function LoginBrandPanel() {
+  // Hanya ambil pengaturan bila sudah login (ada token). Tanpa guard ini,
+  // request di halaman login akan mengembalikan 401 → interceptor redirect
+  // ke /login → halaman dimuat ulang terus-menerus.
+  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('token');
+  const { data: settings } = useQuery<AppSettings>({
+    queryKey: ['settings'],
+    queryFn: () => settingsService.all(),
+    enabled: hasToken,
+    staleTime: 5 * 60 * 1000,
+  });
+  const logoPath = settings?.application?.logo_path ?? settings?.profile?.logo_path ?? null;
+  const logoUrl = logoPath ? `/storage/${logoPath}` : null;
+  const appName = settings?.application?.app_name || settings?.profile?.name || null;
+
   return (
     <aside className="relative hidden overflow-hidden bg-gradient-to-br from-[#075B30] to-[#0D753F] text-white md:flex">
       {/* ===== Decorative elements (subtle, 3%–10% opacity) ===== */}
@@ -48,12 +65,24 @@ export function LoginBrandPanel() {
       <div className="relative z-10 flex h-full w-full flex-col justify-between p-8 lg:p-12">
         {/* Branding */}
         <div className="flex items-center gap-3 animate-fade-up">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/10 ring-1 ring-white/10">
-            <BookOpen size={20} className="text-[#B8F3D8]" aria-hidden="true" />
-          </div>
+          {logoUrl ? (
+            <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/95 ring-1 ring-white/20">
+              <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
+            </div>
+          ) : (
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/10 ring-1 ring-white/10">
+              <BookOpen size={20} className="text-[#B8F3D8]" aria-hidden="true" />
+            </div>
+          )}
           <div className="leading-tight">
-            <p className="text-lg font-bold text-white">Tahfidz</p>
-            <p className="-mt-0.5 text-lg font-bold text-[#7EE2B8]">Qur'an</p>
+            {appName ? (
+              <p className="max-w-[220px] truncate text-lg font-bold text-white">{appName}</p>
+            ) : (
+              <>
+                <p className="text-lg font-bold text-white">Tahfidz</p>
+                <p className="-mt-0.5 text-lg font-bold text-[#7EE2B8]">Qur'an</p>
+              </>
+            )}
           </div>
         </div>
 

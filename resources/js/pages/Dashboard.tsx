@@ -796,6 +796,7 @@ export default function Dashboard() {
   });
 
   const isStudent = user?.role === 'student';
+  const isAdmin = user?.role === 'super_admin';
   const todayLabel = new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',
     day: 'numeric',
@@ -806,7 +807,10 @@ export default function Dashboard() {
   const quickActions = [
     { label: 'Tambah Setoran', href: '/submissions', icon: Plus, color: 'bg-gradient-to-br from-[#075B30] to-[#0D753F] text-white hover:from-[#064A27] hover:to-[#075B30]' },
     { label: 'Tambah Muraja\'ah', href: '/murajaah', icon: BookMarked, color: 'bg-gradient-to-br from-[#075B30] to-[#0D753F] text-white hover:from-[#064A27] hover:to-[#075B30]' },
-    { label: 'Tambah Santri', href: '/students', icon: GraduationCap, color: 'bg-gradient-to-br from-[#075B30] to-[#0D753F] text-white hover:from-[#064A27] hover:to-[#075B30]' },
+    // Hanya super admin yang boleh menambah santri.
+    ...(isAdmin
+      ? [{ label: 'Tambah Santri', href: '/students', icon: GraduationCap, color: 'bg-gradient-to-br from-[#075B30] to-[#0D753F] text-white hover:from-[#064A27] hover:to-[#075B30]' }]
+      : []),
   ];
 
   return (

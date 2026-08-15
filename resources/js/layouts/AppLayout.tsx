@@ -20,6 +20,9 @@ import {
   UserRound,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { settingsService } from '@/services/api';
+import type { AppSettings } from '@/types';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -40,6 +43,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { data: settings } = useQuery<AppSettings>({
+    queryKey: ['settings'],
+    queryFn: () => settingsService.all(),
+    // Hanya ambil settings bila ada token; hindari loop 401 → redirect /login.
+    enabled: !!localStorage.getItem('token'),
+    staleTime: 5 * 60 * 1000,
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('sidebar-collapsed') === '1';
@@ -84,6 +94,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const filteredMenu = menuItems.filter((item) => user && item.roles.includes(user.role));
 
+  const logoPath = settings?.application?.logo_path ?? settings?.profile?.logo_path ?? null;
+  const logoUrl = logoPath ? `/storage/${logoPath}` : null;
+  const appName = settings?.application?.app_name || settings?.profile?.name || 'Tahfidz Qur\'an';
+
+  // Terapkan favicon + judul tab dari settings (identitas aplikasi).
+  useEffect(() => {
+    if (settings?.application?.favicon_path) {
+      let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      link.href = `/storage/${settings.application.favicon_path}`;
+    }
+    const title = settings?.application?.app_name || settings?.profile?.name;
+    if (title) document.title = title;
+  }, [settings]);
+
   return (
     <div className="min-h-screen bg-slate-50 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_30%)]">
       {/* Mobile sidebar backdrop */}
@@ -105,13 +134,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
             sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''
           }`}
         >
-          <Link to="/dashboard" className="flex items-center gap-2.5">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
-              <Moon className="h-5 w-5" fill="white" strokeWidth={2} />
-            </span>
-            <span className={`leading-tight ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
-              <span className="block text-[15px] font-extrabold tracking-tight text-slate-900">Tahfidz</span>
-              <span className="block text-[15px] font-extrabold tracking-tight text-slate-900">Qur'an</span>
+          <Link to="/dashboard" className="flex items-center gap-2.5 min-w-0">
+            {logoUrl ? (
+              <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white ring-1 ring-slate-100">
+                <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
+              </span>
+            ) : (
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
+                <Moon className="h-5 w-5" fill="white" strokeWidth={2} />
+              </span>
+            )}
+            <span className={`leading-tight truncate ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+              <span className="block text-[15px] font-extrabold tracking-tight text-slate-900 truncate">{appName}</span>
             </span>
           </Link>
           <button className="lg:hidden rounded-lg p-2 hover:bg-slate-100" onClick={() => setSidebarOpen(false)}>

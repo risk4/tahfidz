@@ -47,11 +47,16 @@ class ProgressController extends Controller
         }
 
         $query = StudentProgressSummary::query()
-            ->with(['student:id,name,student_code,class_id', 'student.classRoom:id,name']);
+            ->with(['student:id,name,student_code,class_id,memorization_target,starting_juz', 'student.classRoom:id,name']);
 
         if ($user->isTeacher()) {
             $teacherId = $user->teacher?->id;
-            $query->whereHas('student.tahfidzGroups', fn ($q) => $q->where('teacher_id', $teacherId));
+            $query->whereHas('student', function ($student) use ($teacherId) {
+                $student->where(function ($q) use ($teacherId) {
+                    $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
+                        ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
+                });
+            });
         }
 
         if ($classId = $request->integer('class_id')) {
@@ -83,7 +88,12 @@ class ProgressController extends Controller
 
         if ($user->isTeacher()) {
             $teacherId = $user->teacher?->id;
-            $query->whereHas('student.tahfidzGroups', fn ($q) => $q->where('teacher_id', $teacherId));
+            $query->whereHas('student', function ($student) use ($teacherId) {
+                $student->where(function ($q) use ($teacherId) {
+                    $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
+                        ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
+                });
+            });
         }
 
         if ($classId = $request->integer('class_id')) {

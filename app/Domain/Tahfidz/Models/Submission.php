@@ -21,7 +21,7 @@ class Submission extends Model
 
     protected $fillable = [
         'student_id', 'teacher_id', 'academic_year_id', 'submission_date', 'submission_time',
-        'surah_id', 'start_ayah', 'end_ayah', 'type',
+        'surah_id', 'start_ayah', 'end_ayah', 'type', 'method',
         'fluency_score', 'tajwid_score', 'makhraj_score', 'fashahah_score',
         'final_score', 'page_count', 'status', 'notes', 'audio_path',
     ];

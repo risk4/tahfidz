@@ -472,7 +472,7 @@ export default function Progress() {
       <div className="space-y-6">
         <div>
           <p className="text-sm font-semibold text-emerald-600">Tahfidz</p>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Progress Hafalan Saya</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Progress Hafalan Saya</h1>
           <p className="mt-1 text-slate-500">Pantau capaian hafalan dan nilai rata-rata.</p>
         </div>
 
@@ -518,7 +518,7 @@ export default function Progress() {
     <div className="space-y-6">
       <div>
         <p className="text-sm font-semibold text-emerald-600">Tahfidz</p>
-        <h1 className="text-3xl font-black tracking-tight text-slate-900">Progress Hafalan</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Progress Hafalan</h1>
         <p className="mt-1 text-slate-500">Pantau capaian hafalan siswa berdasarkan setoran yang sudah tercatat.</p>
       </div>
 
@@ -633,7 +633,11 @@ export default function Progress() {
                     </td>
                     <td className="px-3 py-3 text-slate-600">{summary.total_ayah_covered}</td>
                     <td className="px-3 py-3 text-slate-600">{summary.total_surah_completed}</td>
-                    <td className="px-3 py-3 text-slate-600">{summary.total_juz_completed}</td>
+                    <td className="px-3 py-3 text-slate-600">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                        <Layers className="h-3 w-3" /> {summary.student?.memorization_target ?? summary.total_juz_completed} Juz
+                      </span>
+                    </td>
                     <td className="px-3 py-3">
                       <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{summary.average_score ?? 0}</span>
                     </td>

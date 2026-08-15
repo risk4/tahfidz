@@ -67,7 +67,7 @@ export default function AcademicYears() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-emerald-600">Kalender Akademik</p>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Tahun Ajaran</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Tahun Ajaran</h1>
           <p className="mt-1 text-slate-500">Kelola periode belajar dan pilih tahun ajaran aktif.</p>
         </div>
         {!showForm && <Button onClick={() => setShowForm(true)}><Plus className="w-4 h-4 mr-2" /> Tambah Tahun</Button>}

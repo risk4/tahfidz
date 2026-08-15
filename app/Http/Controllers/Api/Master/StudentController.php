@@ -32,10 +32,14 @@ class StudentController extends Controller
             ->withCount(['submissions', 'murajaahs'])
             ->with(['progressSummary']);
 
-        // Guru hanya melihat siswa yang tergabung dalam kelompok binaannya.
+        // Guru hanya melihat siswa binaannya: murid kelas yang ia wali (homeroom)
+        // ATAU murid yang tergabung dalam kelompok tahfidz binaannya.
         if ($request->user()->isTeacher()) {
             $teacherId = $request->user()->teacher?->id;
-            $query->whereHas('tahfidzGroups', fn ($q) => $q->where('teacher_id', $teacherId));
+            $query->where(function ($q) use ($teacherId) {
+                $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
+                    ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
+            });
         }
 
         if ($classId = $request->integer('class_id') ?: $request->integer('kelas_id')) {
@@ -187,7 +191,10 @@ class StudentController extends Controller
 
         if ($request->user()->isTeacher()) {
             $teacherId = $request->user()->teacher?->id;
-            $query->whereHas('tahfidzGroups', fn ($q) => $q->where('teacher_id', $teacherId));
+            $query->where(function ($q) use ($teacherId) {
+                $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
+                    ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
+            });
         }
         if ($classId = $request->integer('class_id') ?: $request->integer('kelas_id')) {
             $query->where('class_id', $classId);

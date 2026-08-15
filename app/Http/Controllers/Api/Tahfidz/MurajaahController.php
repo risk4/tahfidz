@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Tahfidz;
 use App\Domain\Academic\Models\AcademicYear;
 use App\Domain\People\Models\Student;
 use App\Domain\People\Models\Teacher;
+use App\Domain\Quran\Models\QuranSurah;
 use App\Domain\Tahfidz\Models\Murajaah;
 use App\Domain\Tahfidz\Models\StudentAyahCoverage;
 use App\Domain\Tahfidz\Services\ProgressService;
@@ -29,10 +30,16 @@ class MurajaahController extends Controller
         $query = Murajaah::query()
             ->with(['student.classRoom', 'teacher', 'academicYear', 'surah']);
 
-        // Guru hanya melihat murajaah siswa yang ia bina.
+        // Guru hanya melihat murajaah siswa binaannya: murid kelas yang ia wali
+        // (homeroom) ATAU murid dalam kelompok tahfidz binaannya.
         if ($request->user()->isTeacher()) {
             $teacherId = $request->user()->teacher?->id;
-            $query->whereHas('student.tahfidzGroups', fn ($q) => $q->where('teacher_id', $teacherId));
+            $query->whereHas('student', function ($student) use ($teacherId) {
+                $student->where(function ($q) use ($teacherId) {
+                    $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
+                        ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
+                });
+            });
         }
 
         if ($studentId = $request->integer('student_id')) {
@@ -90,10 +97,14 @@ class MurajaahController extends Controller
 
         $perPage = min(max((int) $request->query('per_page', 10), 1), 100);
 
-        return $query
+        $murajaahs = $query
             ->orderByDesc('date')
             ->orderByDesc('time')
             ->paginate($perPage);
+
+        QuranSurah::attachJuzRanges($murajaahs->getCollection()->pluck('surah'));
+
+        return $murajaahs;
     }
 
     public function store(StoreMurajaahRequest $request)
@@ -119,7 +130,11 @@ class MurajaahController extends Controller
     {
         $this->authorize('view', $murajaah);
 
-        return $murajaah->load(['student.classRoom', 'teacher', 'academicYear', 'surah']);
+        $murajaah->load(['student.classRoom', 'teacher', 'academicYear', 'surah']);
+
+        QuranSurah::attachJuzRanges([$murajaah->surah]);
+
+        return $murajaah;
     }
 
     public function update(StoreMurajaahRequest $request, Murajaah $murajaah)

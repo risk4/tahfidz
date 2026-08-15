@@ -453,6 +453,7 @@ export const submissionService = {
     end_ayah: number;
     page_count?: number;
     type: 'new_memorization' | 'repetition';
+    method?: 'setoran' | 'murojaah' | 'tasmi' | 'sambung_ayat';
     status?: 'pending' | 'approved' | 'revision' | 'rejected';
     fluency_score: number;
     tajwid_score: number;
@@ -475,6 +476,7 @@ export const submissionService = {
     end_ayah: number;
     page_count?: number;
     type: 'new_memorization' | 'repetition';
+    method?: 'setoran' | 'murojaah' | 'tasmi' | 'sambung_ayat';
     status?: 'pending' | 'approved' | 'revision' | 'rejected';
     fluency_score: number;
     tajwid_score: number;

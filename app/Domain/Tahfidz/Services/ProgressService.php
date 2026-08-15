@@ -44,7 +44,40 @@ class ProgressService
         $average = Submission::where('student_id', $student->id)->avg('final_score');
         $last = Submission::where('student_id', $student->id)->max('submission_date');
 
-        $progress = $totalAyahQuran > 0 ? round(($totalCovered / $totalAyahQuran) * 100, 2) : 0;
+        // Progress dihitung relatif terhadap target hafalan siswa (jumlah juz).
+        // Rentang target: mulai dari Juz Awal (default 30) mundur sejumlah target.
+        // Contoh: target 1 juz + Juz Awal 30 → progress = cakupan ayat di Juz 30.
+        // Tanpa target terisi, fallback ke progress terhadap seluruh Al-Qur'an.
+        $targetJuz = (int) $student->memorization_target;
+        $startJuz = (int) $student->starting_juz;
+
+        if ($targetJuz > 0 && $startJuz > 0) {
+            $targetJuzNumbers = [];
+            for ($i = 0; $i < $targetJuz; $i++) {
+                $j = $startJuz - $i;
+                if ($j < 1) {
+                    $j += 30;
+                }
+                $targetJuzNumbers[] = $j;
+            }
+            $targetJuzNumbers = array_values(array_unique($targetJuzNumbers));
+
+            $targetAyahs = DB::table('quran_ayahs')
+                ->join('quran_juz', 'quran_ayahs.juz_id', '=', 'quran_juz.id')
+                ->whereIn('quran_juz.juz_number', $targetJuzNumbers)
+                ->get(['quran_ayahs.surah_id', 'quran_ayahs.ayah_number']);
+
+            $coveredBySurah = $covered->map(fn ($ayahs) => $ayahs->map(fn ($n) => (int) $n));
+
+            $targetTotal = $targetAyahs->count();
+            $targetCovered = $targetAyahs->filter(function ($ayah) use ($coveredBySurah) {
+                return $coveredBySurah->get($ayah->surah_id)?->contains((int) $ayah->ayah_number) ?? false;
+            })->count();
+
+            $progress = $targetTotal > 0 ? round(($targetCovered / $targetTotal) * 100, 2) : 0;
+        } else {
+            $progress = $totalAyahQuran > 0 ? round(($totalCovered / $totalAyahQuran) * 100, 2) : 0;
+        }
 
         $summary = StudentProgressSummary::updateOrCreate(
             ['student_id' => $student->id],
