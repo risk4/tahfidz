@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Replace default Authenticate middleware with custom API-aware version
         $middleware->alias([
             'auth' => \App\Http\Middleware\AuthenticateApi::class,
+            'password.changed' => \App\Http\Middleware\EnsurePasswordChanged::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

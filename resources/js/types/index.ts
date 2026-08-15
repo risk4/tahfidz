@@ -3,6 +3,7 @@ export interface User {
   name: string;
   email: string;
   role: 'super_admin' | 'teacher' | 'student';
+  must_change_password?: boolean;
   teacher_id?: number;
   student_id?: number;
 }
@@ -37,15 +38,41 @@ export interface Student {
   student_code: string;
   nis?: string;
   nisn?: string;
+  nik?: string;
   name: string;
   gender: 'L' | 'P';
   birth_place?: string;
   birth_date?: string;
+  photo_path?: string;
+  address?: string;
+  phone?: string;
   class_id: number;
   academic_year_id: number;
-  status: 'active' | 'inactive' | 'graduated';
+  entry_year?: number;
+  status: 'active' | 'inactive' | 'graduated' | 'transferred';
+  father_name?: string;
+  mother_name?: string;
+  guardian_name?: string;
+  guardian_phone?: string;
+  guardian_address?: string;
+  memorization_target?: number;
+  starting_juz?: number;
+  notes?: string;
+  submissions_count?: number;
+  murajaahs_count?: number;
   class_room?: ClassRoom;
   academic_year?: AcademicYear;
+  tahfidz_groups?: TahfidzGroup[];
+  progress_summary?: StudentProgressSummary;
+  tahfidz_profile?: {
+    total_juz: number;
+    progress_target: number;
+    hafalan_terakhir?: string;
+    setoran_terakhir?: string;
+    murajaah_terakhir?: string;
+    total_setoran: number;
+    total_murajaah: number;
+  };
 }
 
 export interface ClassRoom {
@@ -67,6 +94,7 @@ export interface TahfidzGroup {
   teacher?: Teacher;
   academic_year?: AcademicYear;
   members?: Student[];
+  members_count?: number;
 }
 
 export interface QuranSurah {
@@ -104,16 +132,20 @@ export interface Submission {
   teacher_id: number;
   academic_year_id: number;
   submission_date: string;
+  submission_time?: string | null;
   surah_id: number;
   start_ayah: number;
   end_ayah: number;
+  page_count?: number | string | null;
   type: 'new_memorization' | 'repetition';
   fluency_score: number;
   tajwid_score: number;
   makhraj_score: number;
   fashahah_score: number;
   final_score: number;
+  status?: 'pending' | 'approved' | 'revision' | 'rejected';
   notes?: string;
+  audio_path?: string | null;
   student?: Student;
   teacher?: Teacher;
   academic_year?: AcademicYear;
@@ -126,16 +158,22 @@ export interface Murajaah {
   teacher_id: number;
   academic_year_id: number;
   date: string;
+  time?: string | null;
+  juz?: number | null;
   surah_id: number;
   start_ayah: number;
   end_ayah: number;
+  page_count?: number | string | null;
+  method?: 'independent' | 'repeated' | 'group' | 'guided';
+  duration_minutes?: number | null;
   fluency_score: number;
   tajwid_score: number;
   makhraj_score: number;
   fashahah_score: number;
   final_score: number;
-  status: 'LANCAR' | 'PERLU_MUROJAAH';
+  status: 'pending' | 'approved' | 'revision' | 'rejected' | 'LANCAR' | 'PERLU_MUROJAAH';
   notes?: string;
+  audio_path?: string | null;
   student?: Student;
   teacher?: Teacher;
   academic_year?: AcademicYear;

@@ -23,7 +23,7 @@ class SubmissionController extends Controller
         $this->authorize('viewAny', Submission::class);
 
         $query = Submission::query()
-            ->with(['student', 'teacher', 'academicYear', 'surah']);
+            ->with(['student.classRoom', 'teacher', 'academicYear', 'surah']);
 
         // Guru hanya melihat submission siswa yang ia bina (lewat kelompok tahfidz).
         if ($request->user()->isTeacher()) {
@@ -35,23 +35,58 @@ class SubmissionController extends Controller
             $query->where('student_id', $studentId);
         }
 
+        if ($search = trim((string) $request->input('search'))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('notes', 'like', "%{$search}%")
+                    ->orWhereHas('student', fn ($student) => $student
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('student_code', 'like', "%{$search}%")
+                        ->orWhere('nis', 'like', "%{$search}%"))
+                    ->orWhereHas('surah', fn ($surah) => $surah
+                        ->where('name_latin', 'like', "%{$search}%")
+                        ->orWhere('translation', 'like', "%{$search}%")
+                        ->orWhere('surah_number', $search));
+            });
+        }
+
         if ($surahId = $request->integer('surah_id')) {
             $query->where('surah_id', $surahId);
+        }
+
+        if ($juz = $request->integer('juz')) {
+            $query->whereHas('surah.ayahs', function ($ayah) use ($juz) {
+                $ayah->whereHas('juz', fn ($juzQuery) => $juzQuery->where('juz_number', $juz));
+            });
+        }
+
+        if ($type = $request->input('type')) {
+            $query->where('type', $type);
+        }
+
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
         }
 
         if ($academicYearId = $request->integer('academic_year_id')) {
             $query->where('academic_year_id', $academicYearId);
         }
 
-        if ($from = $request->input('from')) {
+        if ($from = $request->input('from', $request->input('date_from'))) {
             $query->whereDate('submission_date', '>=', $from);
         }
 
-        if ($to = $request->input('to')) {
+        if ($to = $request->input('to', $request->input('date_to'))) {
             $query->whereDate('submission_date', '<=', $to);
         }
 
-        return $query->latest('submission_date')->paginate(20);
+        $perPage = min(max($request->integer('per_page', 10), 10), 100);
+
+        return $query
+            ->orderByDesc('submission_date')
+            ->orderByDesc('submission_time')
+            ->orderByDesc('id')
+            ->paginate($perPage)
+            ->withQueryString();
     }
 
     public function store(StoreSubmissionRequest $request)
@@ -78,7 +113,7 @@ class SubmissionController extends Controller
     {
         $this->authorize('view', $submission);
 
-        return $submission->load(['student', 'teacher', 'academicYear', 'surah']);
+        return $submission->load(['student.classRoom', 'teacher', 'academicYear', 'surah']);
     }
 
     public function update(StoreSubmissionRequest $request, Submission $submission)

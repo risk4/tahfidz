@@ -12,10 +12,12 @@ import {
   LogOut,
   Menu,
   X,
-  Sparkles,
+  Moon,
   ClipboardList,
   BarChart3,
   BookMarked,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -24,7 +26,7 @@ interface AppLayoutProps {
 }
 
 const menuItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['super_admin', 'teacher', 'student'] },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['super_admin', 'teacher', 'student'] },
   { path: '/academic-years', label: 'Tahun Ajaran', icon: Calendar, roles: ['super_admin'] },
   { path: '/teachers', label: 'Guru', icon: Users, roles: ['super_admin'] },
   { path: '/students', label: 'Siswa', icon: GraduationCap, roles: ['super_admin', 'teacher'] },
@@ -40,6 +42,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('sidebar-collapsed') === '1';
+  });
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('sidebar-collapsed', next ? '1' : '0');
+      return next;
+    });
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -60,25 +73,29 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-72 bg-slate-950 text-white shadow-2xl transform transition-transform duration-200 ease-in-out lg:translate-x-0 ${
+        className={`fixed top-0 left-0 z-50 h-full w-64 border-r border-slate-100 bg-white text-slate-900 shadow-xl transform transition-all duration-200 ease-in-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } ${sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'} lg:translate-x-0`}
       >
-        <div className="flex items-center justify-between h-20 px-5 border-b border-white/10">
-          <Link to="/" className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-400/20">
-              <Sparkles className="h-5 w-5" />
+        <div
+          className={`flex items-center justify-between h-20 px-5 border-b border-slate-100 ${
+            sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''
+          }`}
+        >
+          <Link to="/dashboard" className="flex items-center gap-2.5">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
+              <Moon className="h-5 w-5" fill="white" strokeWidth={2} />
             </span>
-            <span>
-              <span className="block text-lg font-extrabold tracking-tight">Tahfidz App</span>
-              <span className="block text-xs text-emerald-200">Manajemen Hafalan</span>
+            <span className={`leading-tight ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+              <span className="block text-[15px] font-extrabold tracking-tight text-slate-900">Tahfidz</span>
+              <span className="block text-[15px] font-extrabold tracking-tight text-slate-900">Qur'an</span>
             </span>
           </Link>
-          <button className="lg:hidden rounded-lg p-2 hover:bg-white/10" onClick={() => setSidebarOpen(false)}>
+          <button className="lg:hidden rounded-lg p-2 hover:bg-slate-100" onClick={() => setSidebarOpen(false)}>
             <X className="w-5 h-5" />
           </button>
         </div>
-        <nav className="p-4 space-y-1.5">
+        <nav className="p-3 space-y-1">
           {filteredMenu.map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
@@ -87,18 +104,26 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''
+                } ${
                   disabled
-                    ? 'pointer-events-none text-slate-500'
+                    ? 'pointer-events-none text-slate-400'
                     : isActive
-                      ? 'bg-white text-slate-950 shadow-lg'
-                      : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                 }`}
                 onClick={() => setSidebarOpen(false)}
+                title={sidebarCollapsed ? item.label : undefined}
+                aria-label={sidebarCollapsed ? item.label : undefined}
               >
-                <Icon className="w-5 h-5" />
-                <span className="flex-1">{item.label}</span>
-                {disabled && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-slate-400">soon</span>}
+                <Icon className="w-4 h-4 shrink-0" strokeWidth={2} />
+                <span className={`flex-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
+                {disabled && (
+                  <span className={`rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-400 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                    soon
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -106,12 +131,22 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </aside>
 
       {/* Main content */}
-      <div className="lg:pl-72">
+      <div className={`transition-[padding] duration-200 ease-in-out ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
         {/* Topbar */}
         <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200/70 flex items-center justify-between px-4 sm:px-6">
-          <button className="lg:hidden rounded-xl border bg-white p-2 shadow-sm" onClick={() => setSidebarOpen(true)}>
-            <Menu className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button className="lg:hidden rounded-xl border bg-white p-2 shadow-sm" onClick={() => setSidebarOpen(true)}>
+              <Menu className="w-6 h-6" />
+            </button>
+            <button
+              onClick={toggleSidebarCollapsed}
+              title={sidebarCollapsed ? 'Tampilkan sidebar' : 'Sembunyikan sidebar'}
+              aria-label={sidebarCollapsed ? 'Tampilkan sidebar' : 'Sembunyikan sidebar'}
+              className="hidden lg:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+            >
+              {sidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+            </button>
+          </div>
           <div className="flex items-center gap-4 ml-auto">
             <div className="hidden text-right text-sm sm:block">
               <span className="block font-semibold text-slate-900">{user?.name}</span>

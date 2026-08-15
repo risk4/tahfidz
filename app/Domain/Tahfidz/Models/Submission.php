@@ -20,15 +20,18 @@ class Submission extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'student_id', 'teacher_id', 'academic_year_id', 'submission_date',
+        'student_id', 'teacher_id', 'academic_year_id', 'submission_date', 'submission_time',
         'surah_id', 'start_ayah', 'end_ayah', 'type',
         'fluency_score', 'tajwid_score', 'makhraj_score', 'fashahah_score',
-        'final_score', 'notes',
+        'final_score', 'page_count', 'status', 'notes', 'audio_path',
     ];
 
     protected function casts(): array
     {
-        return ['submission_date' => 'date'];
+        return [
+            'submission_date' => 'date',
+            'page_count' => 'decimal:1',
+        ];
     }
 
     public function student()

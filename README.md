@@ -173,17 +173,21 @@ Jika menggunakan Laragon/Apache/Nginx, pastikan document root mengarah ke folder
 public
 ```
 
-## Akun Default
+## Akun Seeder
 
 Setelah menjalankan seeder, tersedia akun awal berikut:
 
-| Role | Email | Password |
-|---|---|---|
-| Super Admin | admin@example.com | password |
-| Guru | guru1@example.com | password |
-| Siswa | siswa1@example.com | password |
+| Role | Email |
+|---|---|
+| Super Admin | admin@example.com |
+| Guru | guru1@example.com |
+| Siswa | siswa1@example.com |
 
-Segera ubah password default jika aplikasi digunakan di lingkungan produksi.
+Password setiap akun **dibuat acak saat seeding** dan dicetak ke console (baris diawali `Akun seeder dibuat dengan password acak...`). Simpan catatan password tersebut karena tidak akan ditampilkan lagi.
+
+Semua akun seeder ditandai `must_change_password` — pada login pertama, aplikasi akan mewajibkan pengguna mengganti password sebelum bisa mengakses fitur lain.
+
+Untuk development lokal yang ingin password tetap, set variabel env `SEED_USER_PASSWORD` (mis. `SEED_USER_PASSWORD=password`) lalu jalankan `php artisan migrate:fresh --seed`.
 
 ## Struktur Menu
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Tahfidz;
 
 use App\Domain\Academic\Models\AcademicYear;
+use App\Domain\People\Models\Student;
 use App\Domain\People\Models\Teacher;
 use App\Domain\Tahfidz\Models\Murajaah;
 use App\Domain\Tahfidz\Models\StudentAyahCoverage;
@@ -26,7 +27,7 @@ class MurajaahController extends Controller
         $this->authorize('viewAny', Murajaah::class);
 
         $query = Murajaah::query()
-            ->with(['student', 'teacher', 'academicYear', 'surah']);
+            ->with(['student.classRoom', 'teacher', 'academicYear', 'surah']);
 
         // Guru hanya melihat murajaah siswa yang ia bina.
         if ($request->user()->isTeacher()) {
@@ -38,15 +39,61 @@ class MurajaahController extends Controller
             $query->where('student_id', $studentId);
         }
 
+        if ($search = trim((string) $request->query('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('notes', 'like', "%{$search}%")
+                    ->orWhere('juz', $search)
+                    ->orWhereHas('student', fn ($sq) => $sq
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('student_code', 'like', "%{$search}%")
+                        ->orWhere('nis', 'like', "%{$search}%"))
+                    ->orWhereHas('surah', fn ($sq) => $sq
+                        ->where('name_latin', 'like', "%{$search}%")
+                        ->orWhere('translation', 'like', "%{$search}%"));
+            });
+        }
+
         if ($surahId = $request->integer('surah_id')) {
             $query->where('surah_id', $surahId);
+        }
+
+        if ($juz = $request->integer('juz')) {
+            $query->where('juz', $juz);
+        }
+
+        if ($method = $request->query('method', $request->query('metode'))) {
+            $query->where('method', $method);
+        }
+
+        if ($status = $request->query('status')) {
+            $query->where('status', match ($status) {
+                'LANCAR' => 'approved',
+                'PERLU_MUROJAAH' => 'revision',
+                default => $status,
+            });
+        }
+
+        $dateFrom = $request->query('date_from', $request->query('from'));
+        $dateTo = $request->query('date_to', $request->query('to'));
+
+        if ($dateFrom) {
+            $query->whereDate('date', '>=', $dateFrom);
+        }
+
+        if ($dateTo) {
+            $query->whereDate('date', '<=', $dateTo);
         }
 
         if ($academicYearId = $request->integer('academic_year_id')) {
             $query->where('academic_year_id', $academicYearId);
         }
 
-        return $query->latest('date')->paginate(20);
+        $perPage = min(max((int) $request->query('per_page', 10), 1), 100);
+
+        return $query
+            ->orderByDesc('date')
+            ->orderByDesc('time')
+            ->paginate($perPage);
     }
 
     public function store(StoreMurajaahRequest $request)
@@ -72,7 +119,7 @@ class MurajaahController extends Controller
     {
         $this->authorize('view', $murajaah);
 
-        return $murajaah->load(['student', 'teacher', 'academicYear', 'surah']);
+        return $murajaah->load(['student.classRoom', 'teacher', 'academicYear', 'surah']);
     }
 
     public function update(StoreMurajaahRequest $request, Murajaah $murajaah)
@@ -117,11 +164,29 @@ class MurajaahController extends Controller
             'memorization_status' => ['required', 'in:not_memorized,in_progress,memorized'],
         ]);
 
-        if ($data['memorization_status'] === 'not_memorized') {
+        // Ayat yang sudah tercakup submission (first_covered_submission_id
+        // terisi) bersifat otoritatif: status dari murajaah tidak boleh
+        // menimpa atau menghapus coverage tersebut.
+        $submissionCovered = StudentAyahCoverage::where('student_id', $murajaah->student_id)
+            ->where('surah_id', $murajaah->surah_id)
+            ->where('ayah_number', $data['ayah_number'])
+            ->whereNotNull('first_covered_submission_id')
+            ->exists();
+
+        if ($submissionCovered) {
+            // Jangan ubah apa pun; kembalikan status yang benar-benar tersimpan.
+            $stored = StudentAyahCoverage::where('student_id', $murajaah->student_id)
+                ->where('surah_id', $murajaah->surah_id)
+                ->where('ayah_number', $data['ayah_number'])
+                ->value('memorization_status') ?? StudentAyahCoverage::STATUS_MEMORIZED;
+        } elseif ($data['memorization_status'] === 'not_memorized') {
+            // Hapus hanya catatan dari murajaah (bukan coverage submission).
             StudentAyahCoverage::where('student_id', $murajaah->student_id)
                 ->where('surah_id', $murajaah->surah_id)
                 ->where('ayah_number', $data['ayah_number'])
+                ->whereNull('first_covered_submission_id')
                 ->delete();
+            $stored = 'not_memorized';
         } else {
             StudentAyahCoverage::updateOrCreate(
                 [
@@ -134,13 +199,14 @@ class MurajaahController extends Controller
                     'first_covered_submission_id' => null,
                 ]
             );
+            $stored = $data['memorization_status'];
         }
 
         $this->progressService->recompute($murajaah->student);
 
         return response()->json([
             'ayah_number' => $data['ayah_number'],
-            'memorization_status' => $data['memorization_status'],
+            'memorization_status' => $stored,
         ]);
     }
 

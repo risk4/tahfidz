@@ -17,15 +17,19 @@ class StoreSubmissionRequest extends FormRequest
         return [
             'student_id' => ['required', 'exists:students,id'],
             'submission_date' => ['required', 'date'],
+            'submission_time' => ['nullable', 'date_format:H:i'],
             'surah_id' => ['required', 'exists:quran_surahs,id'],
             'start_ayah' => ['required', 'integer', 'min:1'],
             'end_ayah' => ['required', 'integer', 'min:1', 'gte:start_ayah'],
+            'page_count' => ['nullable', 'numeric', 'min:0.1', 'max:999.9'],
             'type' => ['required', Rule::in(['new_memorization', 'repetition'])],
+            'status' => ['nullable', Rule::in(['pending', 'approved', 'revision', 'rejected'])],
             'fluency_score' => ['required', 'integer', 'min:0', 'max:100'],
             'tajwid_score' => ['required', 'integer', 'min:0', 'max:100'],
             'makhraj_score' => ['required', 'integer', 'min:0', 'max:100'],
             'fashahah_score' => ['required', 'integer', 'min:0', 'max:100'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'audio_path' => ['nullable', 'string', 'max:255'],
         ];
     }
 

@@ -1,12 +1,14 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import AppLayout from '@/layouts/AppLayout';
+import Landing from '@/pages/Landing';
 import Login from '@/pages/Login';
+import ChangePassword from '@/pages/ChangePassword';
 import Dashboard from '@/pages/Dashboard';
 import AcademicYears from '@/pages/AcademicYears';
 import Teachers from '@/pages/Teachers';
-import Students from '@/pages/Students';
+import Students, { SantriProfile } from '@/pages/Students';
 import Classes from '@/pages/Classes';
 import TahfidzGroups from '@/pages/TahfidzGroups';
 import Submissions from '@/pages/Submissions';
@@ -25,6 +27,7 @@ const queryClient = new QueryClient({
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -36,6 +39,18 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Wajib ganti password: hanya halaman change-password yang boleh diakses.
+  if (location.pathname === '/change-password') {
+    if (user.must_change_password) {
+      return <ChangePassword />;
+    }
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (user.must_change_password) {
+    return <Navigate to="/change-password" replace />;
   }
 
   return <AppLayout>{children}</AppLayout>;
@@ -53,7 +68,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -64,6 +79,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/" element={<Landing />} />
       <Route
         path="/login"
         element={
@@ -72,8 +88,9 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+      <Route path="/change-password" element={<PrivateRoute>{null}</PrivateRoute>} />
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <PrivateRoute>
             <Dashboard />
@@ -84,7 +101,7 @@ function AppRoutes() {
         path="/academic-years"
         element={
           <PrivateRoute>
-            {user?.role === 'super_admin' ? <AcademicYears /> : <Navigate to="/" replace />}
+            {user?.role === 'super_admin' ? <AcademicYears /> : <Navigate to="/dashboard" replace />}
           </PrivateRoute>
         }
       />
@@ -92,7 +109,7 @@ function AppRoutes() {
         path="/teachers"
         element={
           <PrivateRoute>
-            {user?.role === 'super_admin' ? <Teachers /> : <Navigate to="/" replace />}
+            {user?.role === 'super_admin' ? <Teachers /> : <Navigate to="/dashboard" replace />}
           </PrivateRoute>
         }
       />
@@ -103,7 +120,19 @@ function AppRoutes() {
             {(user?.role === 'super_admin' || user?.role === 'teacher') ? (
               <Students />
             ) : (
-              <Navigate to="/" replace />
+              <Navigate to="/dashboard" replace />
+            )}
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/santri/:id"
+        element={
+          <PrivateRoute>
+            {(user?.role === 'super_admin' || user?.role === 'teacher') ? (
+              <SantriProfile />
+            ) : (
+              <Navigate to="/dashboard" replace />
             )}
           </PrivateRoute>
         }
@@ -112,7 +141,7 @@ function AppRoutes() {
         path="/classes"
         element={
           <PrivateRoute>
-            {user?.role === 'super_admin' ? <Classes /> : <Navigate to="/" replace />}
+            {user?.role === 'super_admin' ? <Classes /> : <Navigate to="/dashboard" replace />}
           </PrivateRoute>
         }
       />
@@ -123,7 +152,7 @@ function AppRoutes() {
             {(user?.role === 'super_admin' || user?.role === 'teacher') ? (
               <TahfidzGroups />
             ) : (
-              <Navigate to="/" replace />
+              <Navigate to="/dashboard" replace />
             )}
           </PrivateRoute>
         }
@@ -135,7 +164,7 @@ function AppRoutes() {
             {(user?.role === 'super_admin' || user?.role === 'teacher') ? (
               <Submissions />
             ) : (
-              <Navigate to="/" replace />
+              <Navigate to="/dashboard" replace />
             )}
           </PrivateRoute>
         }
@@ -147,7 +176,7 @@ function AppRoutes() {
             {(user?.role === 'super_admin' || user?.role === 'teacher') ? (
               <Murajaah />
             ) : (
-              <Navigate to="/" replace />
+              <Navigate to="/dashboard" replace />
             )}
           </PrivateRoute>
         }

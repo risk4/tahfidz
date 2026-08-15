@@ -15,6 +15,11 @@ export const authService = {
     const response = await api.get<User>('/me');
     return response.data;
   },
+
+  async changePassword(current_password: string, password: string, password_confirmation: string) {
+    const response = await api.post('/auth/change-password', { current_password, password, password_confirmation });
+    return response.data;
+  },
 };
 
 export const academicYearService = {
@@ -78,8 +83,34 @@ export const teacherService = {
   },
 };
 
+type StudentPayload = {
+  student_code: string;
+  name: string;
+  nis?: string;
+  nisn?: string;
+  nik?: string;
+  gender: 'L' | 'P';
+  birth_place?: string;
+  birth_date?: string;
+  photo_path?: string;
+  address?: string;
+  phone?: string;
+  class_id: number;
+  academic_year_id: number;
+  entry_year?: number;
+  status?: string;
+  father_name?: string;
+  mother_name?: string;
+  guardian_name?: string;
+  guardian_phone?: string;
+  guardian_address?: string;
+  memorization_target?: number;
+  starting_juz?: number;
+  notes?: string;
+};
+
 export const studentService = {
-  async list(params?: { page?: number; per_page?: number; search?: string; class_id?: number }) {
+  async list(params?: { page?: number; per_page?: number; search?: string; class_id?: number; kelas_id?: number; halaqah_id?: number; gender?: string; status?: string; tahun_masuk?: number; entry_year?: number }) {
     const response = await api.get('/students', { params });
     return response.data;
   },
@@ -89,39 +120,66 @@ export const studentService = {
     return response.data;
   },
 
-  async create(data: {
-    student_code: string;
-    name: string;
-    nis?: string;
-    nisn?: string;
-    gender: 'L' | 'P';
-    birth_place?: string;
-    birth_date?: string;
-    class_id: number;
-    academic_year_id: number;
-  }) {
+  async create(data: StudentPayload) {
     const response = await api.post('/students', data);
     return response.data;
   },
 
-  async update(id: number, data: Partial<{
-    student_code: string;
-    name: string;
-    nis: string;
-    nisn: string;
-    gender: 'L' | 'P';
-    birth_place: string;
-    birth_date: string;
-    class_id: number;
-    academic_year_id: number;
-    status: string;
-  }>) {
+  async update(id: number, data: Partial<StudentPayload>) {
     const response = await api.put(`/students/${id}`, data);
     return response.data;
   },
 
   async delete(id: number) {
     await api.delete(`/students/${id}`);
+  },
+
+  async export(params?: { search?: string; class_id?: number; halaqah_id?: number; gender?: string; status?: string; tahun_masuk?: number; format?: 'csv' | 'xlsx' }) {
+    const token = localStorage.getItem('token');
+    const format = params?.format ?? 'csv';
+    const query = params ? '?' + new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
+    ).toString() : '';
+    const response = await fetch(`/api/students/export${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Gagal mengunduh data export.');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `export_santri_${new Date().toISOString().slice(0,10)}.${format === 'xlsx' ? 'xlsx' : 'csv'}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  async downloadTemplate(format: 'csv' | 'xlsx' = 'csv') {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`/api/students/import-template?format=${format}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Gagal mengunduh template.');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `template_import_santri.${format === 'xlsx' ? 'xlsx' : 'csv'}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  async import(file: File, mode: 'update' | 'insert_only' = 'update'): Promise<{ message: string; imported: number; skipped: Array<{ row: number; data: string; errors: string[] }> }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('mode', mode);
+    const response = await api.post('/students/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
   },
 };
 
@@ -216,11 +274,17 @@ export const submissionService = {
   async list(params?: {
     page?: number;
     per_page?: number;
+    search?: string;
     student_id?: number;
     surah_id?: number;
+    juz?: number;
+    type?: 'new_memorization' | 'repetition';
+    status?: 'pending' | 'approved' | 'revision' | 'rejected';
     academic_year_id?: number;
     from?: string;
     to?: string;
+    date_from?: string;
+    date_to?: string;
   }) {
     const response = await api.get('/submissions', { params });
     return response.data;
@@ -230,15 +294,19 @@ export const submissionService = {
     student_id: number;
     teacher_id?: number;
     submission_date: string;
+    submission_time?: string;
     surah_id: number;
     start_ayah: number;
     end_ayah: number;
+    page_count?: number;
     type: 'new_memorization' | 'repetition';
+    status?: 'pending' | 'approved' | 'revision' | 'rejected';
     fluency_score: number;
     tajwid_score: number;
     makhraj_score: number;
     fashahah_score: number;
     notes?: string;
+    audio_path?: string;
   }) {
     const response = await api.post('/submissions', data);
     return response.data;
@@ -246,16 +314,21 @@ export const submissionService = {
 
   async update(id: number, data: {
     student_id: number;
+    teacher_id?: number;
     submission_date: string;
+    submission_time?: string;
     surah_id: number;
     start_ayah: number;
     end_ayah: number;
+    page_count?: number;
     type: 'new_memorization' | 'repetition';
+    status?: 'pending' | 'approved' | 'revision' | 'rejected';
     fluency_score: number;
     tajwid_score: number;
     makhraj_score: number;
     fashahah_score: number;
     notes?: string;
+    audio_path?: string;
   }) {
     const response = await api.put(`/submissions/${id}`, data);
     return response.data;
@@ -264,10 +337,15 @@ export const submissionService = {
   async delete(id: number) {
     await api.delete(`/submissions/${id}`);
   },
+
+  async get(id: number) {
+    const response = await api.get(`/submissions/${id}`);
+    return response.data;
+  },
 };
 
 export const murajaahService = {
-  async list(params?: { page?: number; per_page?: number; student_id?: number; surah_id?: number; academic_year_id?: number }) {
+  async list(params?: { page?: number; per_page?: number; search?: string; student_id?: number; surah_id?: number; academic_year_id?: number; juz?: number; method?: string; metode?: string; status?: string; date_from?: string; date_to?: string; from?: string; to?: string }) {
     const response = await api.get('/murajaahs', { params });
     return response.data;
   },
@@ -276,15 +354,21 @@ export const murajaahService = {
     student_id: number;
     teacher_id?: number;
     date: string;
+    time?: string;
+    juz?: number;
     surah_id: number;
     start_ayah: number;
     end_ayah: number;
-    fluency_score: number;
-    tajwid_score: number;
-    makhraj_score: number;
-    fashahah_score: number;
-    status: 'LANCAR' | 'PERLU_MUROJAAH';
+    page_count?: number;
+    method?: 'independent' | 'repeated' | 'group' | 'guided';
+    duration_minutes?: number;
+    fluency_score?: number;
+    tajwid_score?: number;
+    makhraj_score?: number;
+    fashahah_score?: number;
+    status?: 'pending' | 'approved' | 'revision' | 'rejected' | 'LANCAR' | 'PERLU_MUROJAAH';
     notes?: string;
+    audio_path?: string;
   }) {
     const response = await api.post('/murajaahs', data);
     return response.data;
@@ -292,16 +376,23 @@ export const murajaahService = {
 
   async update(id: number, data: {
     student_id: number;
+    teacher_id?: number;
     date: string;
+    time?: string;
+    juz?: number;
     surah_id: number;
     start_ayah: number;
     end_ayah: number;
-    fluency_score: number;
-    tajwid_score: number;
-    makhraj_score: number;
-    fashahah_score: number;
-    status: 'LANCAR' | 'PERLU_MUROJAAH';
+    page_count?: number;
+    method?: 'independent' | 'repeated' | 'group' | 'guided';
+    duration_minutes?: number;
+    fluency_score?: number;
+    tajwid_score?: number;
+    makhraj_score?: number;
+    fashahah_score?: number;
+    status?: 'pending' | 'approved' | 'revision' | 'rejected' | 'LANCAR' | 'PERLU_MUROJAAH';
     notes?: string;
+    audio_path?: string;
   }) {
     const response = await api.put(`/murajaahs/${id}`, data);
     return response.data;

@@ -49,6 +49,7 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
+                'must_change_password' => (bool) $user->must_change_password,
                 'teacher_id' => $user->teacher?->id,
                 'student_id' => $user->student?->id,
             ],
@@ -75,8 +76,38 @@ class AuthController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'role' => $user->role,
+            'must_change_password' => (bool) $user->must_change_password,
             'teacher_id' => $user->teacher?->id,
             'student_id' => $user->student?->id,
         ]);
+    }
+
+    /**
+     * Ubah password pengguna (dipakai untuk mewajibkan ganti password
+     * saat akun dibuat dengan password sementara / default).
+     */
+    public function changePassword(Request $request)
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if (! Hash::check($data['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Password saat ini salah.'],
+            ]);
+        }
+
+        $user->forceFill([
+            'password' => $data['password'],
+            'must_change_password' => false,
+        ])->save();
+
+        $this->auditLog->record($user, 'change_password', User::class, $user->id, $request);
+
+        return response()->json(['message' => 'Password berhasil diubah.']);
     }
 }

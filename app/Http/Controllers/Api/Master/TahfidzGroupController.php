@@ -13,7 +13,7 @@ class TahfidzGroupController extends Controller
     {
         $this->authorize('viewAny', TahfidzGroup::class);
 
-        $query = TahfidzGroup::query()->with('teacher');
+        $query = TahfidzGroup::query()->with('teacher')->withCount('members');
 
         if ($request->user()->isTeacher()) {
             $query->where('teacher_id', $request->user()->teacher?->id);
@@ -56,7 +56,7 @@ class TahfidzGroupController extends Controller
 
     public function addMember(Request $request, TahfidzGroup $tahfidzGroup)
     {
-        $this->authorize('update', $tahfidzGroup);
+        $this->authorize('manageMembers', $tahfidzGroup);
 
         $data = $request->validate([
             'student_id' => ['required', 'exists:students,id'],
@@ -71,7 +71,7 @@ class TahfidzGroupController extends Controller
 
     public function removeMember(TahfidzGroup $tahfidzGroup, int $studentId)
     {
-        $this->authorize('update', $tahfidzGroup);
+        $this->authorize('manageMembers', $tahfidzGroup);
 
         $tahfidzGroup->members()->detach($studentId);
 

@@ -28,9 +28,19 @@ class TahfidzGroupPolicy
 
     public function update(User $user, TahfidzGroup $group): bool
     {
-        // Admin bebas; guru pemilik kelompok boleh mengubah keanggotaan
-        // tapi TIDAK boleh mengubah data master lain (dibatasi di Form Request).
-        return $user->isSuperAdmin() || ($user->isTeacher() && $user->teacher?->id === $group->teacher_id);
+        return $user->isSuperAdmin();
+    }
+
+    /**
+     * Kelola anggota halaqah (tambah/hapus siswa).
+     *
+     * Hanya super admin. Membolehkan guru menambah siswa ke kelompoknya
+     * sendiri akan memberi guru akses penuh ke data pribadi siswa tsb
+     * (lihat StudentPolicy::view), sehingga menjadi celah IDOR.
+     */
+    public function manageMembers(User $user, TahfidzGroup $group): bool
+    {
+        return $user->isSuperAdmin();
     }
 
     public function delete(User $user, TahfidzGroup $group): bool

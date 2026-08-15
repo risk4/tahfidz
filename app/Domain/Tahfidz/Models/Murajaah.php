@@ -17,15 +17,19 @@ class Murajaah extends Model
     protected $table = 'murajaahs';
 
     protected $fillable = [
-        'student_id', 'teacher_id', 'academic_year_id', 'date',
+        'student_id', 'teacher_id', 'academic_year_id', 'date', 'time', 'juz',
         'surah_id', 'start_ayah', 'end_ayah',
+        'page_count', 'method', 'duration_minutes',
         'fluency_score', 'tajwid_score', 'makhraj_score', 'fashahah_score',
-        'final_score', 'status', 'notes',
+        'final_score', 'status', 'notes', 'audio_path',
     ];
 
     protected function casts(): array
     {
-        return ['date' => 'date'];
+        return [
+            'date' => 'date',
+            'page_count' => 'decimal:2',
+        ];
     }
 
     public function student()
