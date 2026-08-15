@@ -34,11 +34,15 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::post('/teachers/import', [TeacherController::class, 'import']);
     Route::get('/teachers/stats', [TeacherController::class, 'stats']);
     Route::get('/teachers/{teacher}/performance', [TeacherController::class, 'performance']);
+    Route::post('/teachers/{teacher}/photo', [TeacherController::class, 'uploadPhoto']);
+    Route::delete('/teachers/{teacher}/photo', [TeacherController::class, 'deletePhoto']);
     Route::apiResource('teachers', TeacherController::class);
 
     Route::get('/students/export', [StudentController::class, 'export']);
     Route::get('/students/import-template', [StudentController::class, 'importTemplate']);
     Route::post('/students/import', [StudentController::class, 'import']);
+    Route::post('/students/{student}/photo', [StudentController::class, 'uploadPhoto']);
+    Route::delete('/students/{student}/photo', [StudentController::class, 'deletePhoto']);
     Route::apiResource('students', StudentController::class);
     Route::apiResource('santri', StudentController::class)->parameters(['santri' => 'student']);
 
@@ -51,6 +55,7 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::delete('/tahfidz-groups/{tahfidzGroup}/members/{studentId}', [TahfidzGroupController::class, 'removeMember']);
 
     // ===== QURAN REFERENCE (STEP 3) — data rujukan hanya-baca =====
+    Route::get('/quran/statistics', [QuranController::class, 'statistics']);
     Route::get('/quran/juz', [QuranController::class, 'juz']);
     Route::get('/quran/surahs', [QuranController::class, 'surahs']);
     Route::get('/quran/surahs/{surah}', [QuranController::class, 'surah']);

@@ -187,7 +187,7 @@ export default function ChangePassword() {
             <button
               type="submit"
               disabled={isLoading}
-              className="group w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-70 text-white text-sm font-semibold rounded-xl py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-700/20 active:scale-95"
+              className="group w-full flex items-center justify-center gap-2 bg-[#0D753F] hover:bg-[#075B30] disabled:opacity-70 text-white text-sm font-semibold rounded-xl py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#0D753F]/20 active:scale-95"
             >
               {isLoading ? (
                 <>

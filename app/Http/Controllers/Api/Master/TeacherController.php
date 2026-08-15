@@ -9,10 +9,12 @@ use App\Domain\Tahfidz\Models\Murajaah;
 use App\Domain\Tahfidz\Models\Submission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Master\StoreTeacherRequest;
+use App\Http\Requests\Master\UploadTeacherPhotoRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -252,6 +254,46 @@ class TeacherController extends Controller
         $teacher->delete();
 
         return response()->json(['message' => 'Guru berhasil dihapus.']);
+    }
+
+    /**
+     * Upload foto guru ke disk public (storage/app/public/teachers).
+     * File lama dihapus bila ada.
+     */
+    public function uploadPhoto(UploadTeacherPhotoRequest $request, Teacher $teacher)
+    {
+        $this->authorize('update', $teacher);
+
+        $old = $teacher->photo_path;
+        if ($old && Storage::disk('public')->exists($old)) {
+            Storage::disk('public')->delete($old);
+        }
+
+        $path = $request->file('file')->store('teachers', 'public');
+
+        $teacher->update(['photo_path' => $path]);
+
+        return response()->json([
+            'message' => 'Foto guru berhasil diunggah.',
+            'photo_path' => $path,
+        ]);
+    }
+
+    /**
+     * Hapus foto guru (file + referensi di database).
+     */
+    public function deletePhoto(Request $request, Teacher $teacher)
+    {
+        $this->authorize('update', $teacher);
+
+        $old = $teacher->photo_path;
+        if ($old && Storage::disk('public')->exists($old)) {
+            Storage::disk('public')->delete($old);
+        }
+
+        $teacher->update(['photo_path' => null]);
+
+        return response()->json(['message' => 'Foto guru berhasil dihapus.']);
     }
 
     /** Data chart harian untuk santri bimbingan guru (setoran/murajaah/target). */

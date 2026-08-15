@@ -171,6 +171,8 @@ export interface QuranSurah {
   name_latin: string;
   translation: string;
   total_ayahs: number;
+  revelation_place?: 'makkiyah' | 'madaniyah' | null;
+  juz_range?: { min: number; max: number } | null;
 }
 
 export interface QuranAyah {
@@ -184,6 +186,14 @@ export interface QuranAyah {
     id: number;
     juz_number: number;
   };
+}
+
+export interface QuranStatistics {
+  total_surahs: number;
+  total_ayahs: number;
+  total_juz: number;
+  makkiyah: number;
+  madaniyah: number;
 }
 
 export type MemorizationStatus = 'not_memorized' | 'in_progress' | 'memorized';

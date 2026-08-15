@@ -7,6 +7,7 @@ use App\Domain\Quran\Models\QuranJuz;
 use App\Domain\Quran\Models\QuranSurah;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -26,18 +27,95 @@ class QuranController extends Controller
     {
         $query = QuranSurah::query();
 
+        if ($search = $request->string('search')->toString()) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name_latin', 'like', "%{$search}%")
+                    ->orWhere('name_arabic', 'like', "%{$search}%")
+                    ->orWhere('translation', 'like', "%{$search}%")
+                    ->orWhere('surah_number', $search);
+            });
+        }
+
+        if ($place = $request->string('revelation_place')->toString()) {
+            if (in_array($place, ['makkiyah', 'madaniyah'], true)) {
+                $query->where('revelation_place', $place);
+            }
+        }
+
+        if ($countFilter = $request->string('ayah_count')->toString()) {
+            match ($countFilter) {
+                'lt50' => $query->where('total_ayahs', '<', 50),
+                '50-100' => $query->whereBetween('total_ayahs', [50, 100]),
+                'gt100' => $query->where('total_ayahs', '>', 100),
+                default => null,
+            };
+        }
+
         if ($juzNumber = $request->integer('juz_number')) {
             $query->whereHas('ayahs.juz', fn ($q) => $q->where('juz_number', $juzNumber))->distinct();
         }
 
-        return response()->json($query->orderBy('surah_number')->get());
+        $query->orderBy('surah_number');
+
+        $ranges = $this->juzRanges();
+        $attachRanges = function ($surahs) use ($ranges) {
+            foreach ($surahs as $surah) {
+                $range = $ranges->get($surah->id);
+                $surah->juz_range = $range ? ['min' => (int) $range->min_juz, 'max' => (int) $range->max_juz] : null;
+            }
+
+            return $surahs;
+        };
+
+        if ($request->has('per_page')) {
+            return response()->json($attachRanges($query->paginate($request->integer('per_page', 12))));
+        }
+
+        return response()->json($attachRanges($query->get()));
+    }
+
+    /**
+     * Statistik referensi Al-Qur'an — dihitung dari database (data statis, di-cache).
+     */
+    public function statistics()
+    {
+        $stats = Cache::remember('quran.statistics', now()->addHours(24), function () {
+            return [
+                'total_surahs' => QuranSurah::count(),
+                'total_ayahs' => QuranAyah::count(),
+                'total_juz' => QuranJuz::count(),
+                'makkiyah' => QuranSurah::where('revelation_place', 'makkiyah')->count(),
+                'madaniyah' => QuranSurah::where('revelation_place', 'madaniyah')->count(),
+            ];
+        });
+
+        return response()->json($stats);
     }
 
     public function surah(Request $request, QuranSurah $surah)
     {
-        $surah->load(['ayahs' => fn ($q) => $q->orderBy('ayah_number')]);
+        $this->ensureRealAyahText($surah);
+
+        $surah->load(['ayahs' => fn ($q) => $q->orderBy('ayah_number')->with('juz:id,juz_number')]);
+
+        $range = $this->juzRanges()->get($surah->id);
+        $surah->juz_range = $range ? ['min' => (int) $range->min_juz, 'max' => (int) $range->max_juz] : null;
 
         return response()->json($surah);
+    }
+
+    /**
+     * Rentang juz per surah, dihitung dari tabel ayat (satu query untuk semua surah).
+     */
+    private function juzRanges()
+    {
+        return QuranAyah::query()
+            ->join('quran_juz', 'quran_ayahs.juz_id', '=', 'quran_juz.id')
+            ->select('quran_ayahs.surah_id')
+            ->selectRaw('MIN(quran_juz.juz_number) as min_juz, MAX(quran_juz.juz_number) as max_juz')
+            ->groupBy('quran_ayahs.surah_id')
+            ->get()
+            ->keyBy('surah_id');
     }
 
     public function ayahs(Request $request, QuranSurah $surah)
@@ -47,6 +125,14 @@ class QuranController extends Controller
         $query = QuranAyah::where('surah_id', $surah->id)
             ->with('juz:id,juz_number')
             ->orderBy('ayah_number');
+
+        if ($search = $request->string('search')->toString()) {
+            $query->where(function ($q) use ($search) {
+                $q->where('ayah_number', (int) $search)
+                    ->orWhere('text_arabic', 'like', "%{$search}%")
+                    ->orWhere('text_translation', 'like', "%{$search}%");
+            });
+        }
 
         if ($from = $request->integer('from')) {
             $query->where('ayah_number', '>=', $from);

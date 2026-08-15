@@ -7,8 +7,10 @@ use App\Domain\Academic\Models\ClassRoom;
 use App\Domain\People\Models\Student;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Master\StoreStudentRequest;
+use App\Http\Requests\Master\UploadStudentPhotoRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -107,6 +109,46 @@ class StudentController extends Controller
         $student->delete();
 
         return response()->json(['message' => 'Siswa berhasil dihapus.']);
+    }
+
+    /**
+     * Upload foto santri ke disk public (storage/app/public/students).
+     * File lama dihapus bila ada.
+     */
+    public function uploadPhoto(UploadStudentPhotoRequest $request, Student $student)
+    {
+        $this->authorize('update', $student);
+
+        $old = $student->photo_path;
+        if ($old && Storage::disk('public')->exists($old)) {
+            Storage::disk('public')->delete($old);
+        }
+
+        $path = $request->file('file')->store('students', 'public');
+
+        $student->update(['photo_path' => $path]);
+
+        return response()->json([
+            'message' => 'Foto santri berhasil diunggah.',
+            'photo_path' => $path,
+        ]);
+    }
+
+    /**
+     * Hapus foto santri (file + referensi di database).
+     */
+    public function deletePhoto(Request $request, Student $student)
+    {
+        $this->authorize('update', $student);
+
+        $old = $student->photo_path;
+        if ($old && Storage::disk('public')->exists($old)) {
+            Storage::disk('public')->delete($old);
+        }
+
+        $student->update(['photo_path' => null]);
+
+        return response()->json(['message' => 'Foto santri berhasil dihapus.']);
     }
 
     /**

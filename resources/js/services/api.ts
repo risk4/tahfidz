@@ -7,6 +7,7 @@ import type {
   MemorizationStatus,
   PaginatedResponse,
   ProgressStats,
+  QuranStatistics,
   SessionInfo,
   TeacherDetail,
   TeacherPerformancePoint,
@@ -136,6 +137,20 @@ export const teacherService = {
     await api.delete(`/teachers/${id}`);
   },
 
+  async uploadPhoto(id: number, file: File): Promise<{ message: string; photo_path: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post(`/teachers/${id}/photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  async deletePhoto(id: number): Promise<{ message: string }> {
+    const response = await api.delete(`/teachers/${id}/photo`);
+    return response.data;
+  },
+
   async export(params?: { search?: string; status?: string; subject?: string; role?: string; class_id?: number; halaqah_id?: number; format?: 'csv' | 'xlsx' }) {
     const token = localStorage.getItem('token');
     const format = params?.format ?? 'csv';
@@ -188,27 +203,27 @@ export const teacherService = {
 type StudentPayload = {
   student_code: string;
   name: string;
-  nis?: string;
-  nisn?: string;
-  nik?: string;
+  nis?: string | null;
+  nisn?: string | null;
+  nik?: string | null;
   gender: 'L' | 'P';
-  birth_place?: string;
-  birth_date?: string;
-  photo_path?: string;
-  address?: string;
-  phone?: string;
+  birth_place?: string | null;
+  birth_date?: string | null;
+  photo_path?: string | null;
+  address?: string | null;
+  phone?: string | null;
   class_id: number;
   academic_year_id: number;
-  entry_year?: number;
+  entry_year?: number | null;
   status?: string;
-  father_name?: string;
-  mother_name?: string;
-  guardian_name?: string;
-  guardian_phone?: string;
-  guardian_address?: string;
-  memorization_target?: number;
-  starting_juz?: number;
-  notes?: string;
+  father_name?: string | null;
+  mother_name?: string | null;
+  guardian_name?: string | null;
+  guardian_phone?: string | null;
+  guardian_address?: string | null;
+  memorization_target?: number | null;
+  starting_juz?: number | null;
+  notes?: string | null;
 };
 
 export const studentService = {
@@ -234,6 +249,20 @@ export const studentService = {
 
   async delete(id: number) {
     await api.delete(`/students/${id}`);
+  },
+
+  async uploadPhoto(id: number, file: File): Promise<{ message: string; photo_path: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post(`/students/${id}/photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  async deletePhoto(id: number): Promise<{ message: string }> {
+    const response = await api.delete(`/students/${id}/photo`);
+    return response.data;
   },
 
   async export(params?: { search?: string; class_id?: number; halaqah_id?: number; gender?: string; status?: string; tahun_masuk?: number; format?: 'csv' | 'xlsx' }) {
@@ -342,8 +371,25 @@ export const tahfidzGroupService = {
 };
 
 export const quranService = {
-  async surahs(params?: { juz_number?: number }) {
+  async surahs(params?: {
+    search?: string;
+    juz_number?: number;
+    revelation_place?: string;
+    ayah_count?: string;
+    page?: number;
+    per_page?: number;
+  }) {
     const response = await api.get('/quran/surahs', { params });
+    return response.data;
+  },
+
+  async surah(id: number | string) {
+    const response = await api.get(`/quran/surahs/${id}`);
+    return response.data;
+  },
+
+  async statistics() {
+    const response = await api.get<QuranStatistics>('/quran/statistics');
     return response.data;
   },
 
@@ -352,7 +398,7 @@ export const quranService = {
     return response.data as Array<{ id: number; juz_number: number }>;
   },
 
-  async ayahs(surahId: number, params?: { from?: number; to?: number; paged?: boolean; per_page?: number }) {
+  async ayahs(surahId: number, params?: { search?: string; from?: number; to?: number; paged?: boolean; per_page?: number }) {
     const response = await api.get(`/quran/surahs/${surahId}/ayahs`, { params });
     return response.data;
   },

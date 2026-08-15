@@ -804,9 +804,9 @@ export default function Dashboard() {
   }).format(new Date());
 
   const quickActions = [
-    { label: 'Tambah Setoran', href: '/submissions', icon: Plus, color: 'bg-emerald-100 text-emerald-700' },
-    { label: 'Tambah Muraja\'ah', href: '/murajaah', icon: BookMarked, color: 'bg-sky-100 text-sky-700' },
-    { label: 'Tambah Santri', href: '/students', icon: GraduationCap, color: 'bg-violet-100 text-violet-700' },
+    { label: 'Tambah Setoran', href: '/submissions', icon: Plus, color: 'bg-gradient-to-br from-[#075B30] to-[#0D753F] text-white hover:from-[#064A27] hover:to-[#075B30]' },
+    { label: 'Tambah Muraja\'ah', href: '/murajaah', icon: BookMarked, color: 'bg-gradient-to-br from-[#075B30] to-[#0D753F] text-white hover:from-[#064A27] hover:to-[#075B30]' },
+    { label: 'Tambah Santri', href: '/students', icon: GraduationCap, color: 'bg-gradient-to-br from-[#075B30] to-[#0D753F] text-white hover:from-[#064A27] hover:to-[#075B30]' },
   ];
 
   return (
@@ -832,13 +832,13 @@ export default function Dashboard() {
             <>
               <Link
                 to="/submissions"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-emerald-600/20 transition-colors hover:bg-emerald-700"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-[#075B30] to-[#0D753F] px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#0D753F]/20 transition-colors hover:from-[#064A27] hover:to-[#075B30]"
               >
                 <Plus className="h-4 w-4" /> Tambah Setoran
               </Link>
               <Link
                 to="/murajaah"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-emerald-200 hover:text-emerald-700"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-[#075B30] to-[#0D753F] px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#0D753F]/20 transition-colors hover:from-[#064A27] hover:to-[#075B30]"
               >
                 <BookMarked className="h-4 w-4" /> Tambah Muraja'ah
               </Link>

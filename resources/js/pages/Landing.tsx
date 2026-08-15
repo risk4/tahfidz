@@ -251,7 +251,7 @@ function Navbar() {
           </Link>
           <Link
             to="/login"
-            className="rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm shadow-emerald-200 transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-700 active:scale-95"
+            className="rounded-full bg-[#0D753F] px-5 py-2 text-sm font-semibold text-white shadow-sm shadow-[#0D753F]/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#075B30] active:scale-95"
           >
             Daftar Gratis
           </Link>
@@ -414,7 +414,7 @@ function Hero() {
           <div className="mt-7 flex flex-wrap items-center gap-3 animate-fade-up [animation-delay:300ms]">
             <Link
               to="/login"
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-700 active:scale-95 animate-pulse-ring"
+              className="inline-flex items-center gap-2 rounded-full bg-[#0D753F] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#0D753F]/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#075B30] active:scale-95 animate-pulse-ring"
             >
               Mulai Sekarang <ArrowRight className="h-4 w-4" />
             </Link>

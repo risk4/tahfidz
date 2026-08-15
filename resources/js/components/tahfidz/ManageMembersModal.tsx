@@ -96,7 +96,7 @@ export default function ManageMembersModal({ group, onClose }: { group: TahfidzG
                   </div>
                   <Button
                     size="sm"
-                    variant="outline"
+                    className="bg-gradient-to-br from-[#075B30] to-[#0D753F] text-white hover:from-[#064A27] hover:to-[#075B30] border-transparent"
                     disabled={addMember.isPending}
                     onClick={() => addMember.mutate(student.id)}
                   >

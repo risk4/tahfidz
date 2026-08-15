@@ -29,7 +29,7 @@ export default function Classes() {
   const { data, isLoading } = useQuery({ queryKey: ['classes', search], queryFn: () => classService.list({ search }) });
   const { data: years } = useQuery({ queryKey: ['academic-years'], queryFn: () => academicYearService.list() });
   const { data: teachers } = useQuery({ queryKey: ['teachers-options'], queryFn: () => teacherService.list({ per_page: 100 }) });
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) });
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<z.input<typeof schema>, any, z.output<typeof schema>>({ resolver: zodResolver(schema) });
 
   const classes: ClassRoom[] = Array.isArray(data) ? data : data?.data ?? [];
   const yearOptions: AcademicYear[] = Array.isArray(years) ? years : years?.data ?? [];

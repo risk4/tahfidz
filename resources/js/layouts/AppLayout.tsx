@@ -12,6 +12,7 @@ import {
   ClipboardList,
   BarChart3,
   BookMarked,
+  BookOpen,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
@@ -30,6 +31,7 @@ const menuItems = [
   { path: '/students', label: 'Siswa', icon: GraduationCap, roles: ['super_admin', 'teacher'] },
   { path: '/submissions', label: 'Setoran Hafalan', icon: ClipboardList, roles: ['super_admin', 'teacher'] },
   { path: '/murajaah', label: 'Murajaah', icon: BookMarked, roles: ['super_admin', 'teacher'] },
+  { path: '/surah-ayat', label: 'Surat & Ayat', icon: BookOpen, roles: ['super_admin', 'teacher'] },
   { path: '/progress', label: 'Progress', icon: BarChart3, roles: ['super_admin', 'teacher', 'student'] },
   { path: '/settings', label: 'Pengaturan', icon: Settings, roles: ['super_admin'] },
 ];
@@ -120,7 +122,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           {filteredMenu.map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
-            const disabled = 'disabled' in item && item.disabled;
+            const disabled = 'disabled' in item && item.disabled === true;
             return (
               <Link
                 key={item.path}
@@ -131,8 +133,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   disabled
                     ? 'pointer-events-none text-slate-400'
                     : isActive
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                      ? 'bg-gradient-to-br from-[#075B30] to-[#0D753F] text-white hover:from-[#064A27] hover:to-[#075B30]'
+                      : 'text-[#64748B] hover:bg-slate-50'
                 }`}
                 onClick={() => setSidebarOpen(false)}
                 title={sidebarCollapsed ? item.label : undefined}

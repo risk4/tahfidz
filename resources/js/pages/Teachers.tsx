@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -114,12 +114,14 @@ function RoleBadge({ teacher }: { teacher: Teacher }) {
   );
 }
 
+const photoUrl = (p?: string | null) => (p ? (p.startsWith('/storage/') || p.startsWith('http') ? p : `/storage/${p}`) : '');
+
 function Avatar({ teacher, size = 'md' }: { teacher: { name?: string; photo_path?: string | null }; size?: 'sm' | 'md' | 'lg' }) {
   const cls = size === 'lg' ? 'h-16 w-16 text-lg' : size === 'sm' ? 'h-8 w-8 text-[10px]' : 'h-10 w-10 text-xs';
   return (
     <span className={`grid shrink-0 place-items-center overflow-hidden rounded-full bg-emerald-100 font-bold text-emerald-700 ${cls}`}>
       {teacher.photo_path ? (
-        <img src={teacher.photo_path} alt="" className="h-full w-full object-cover" />
+        <img src={photoUrl(teacher.photo_path)} alt="" className="h-full w-full object-cover" />
       ) : (
         nameInitials(teacher.name)
       )}
@@ -347,9 +349,10 @@ function TeacherFormModal({
   onClose,
 }: {
   initial: Teacher | null;
-  onSave: (data: Record<string, unknown>) => void;
+  onSave: (data: Record<string, unknown>, photo: File | null) => void;
   onClose: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [name, setName] = useState(initial?.name ?? '');
   const [teacherCode, setTeacherCode] = useState(initial?.teacher_code ?? '');
   const [gender, setGender] = useState(initial?.gender ?? '');
@@ -366,11 +369,42 @@ function TeacherFormModal({
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [error, setError] = useState('');
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const photoRef = useRef<HTMLInputElement>(null);
 
   const inputCls = 'h-9 w-full rounded-lg border border-input bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40';
   const selectCls = inputCls;
 
-  const submit = () => {
+  const chooseFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingPhoto(file);
+    setPhotoPreview(URL.createObjectURL(file));
+    setPhotoError('');
+    e.target.value = '';
+  };
+
+  const deletePhoto = async () => {
+    if (!initial) return;
+    setUploadingPhoto(true);
+    setPhotoError('');
+    try {
+      await teacherService.deletePhoto(initial.id);
+      setPendingPhoto(null);
+      setPhotoPreview(null);
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-detail'] });
+    } catch {
+      setPhotoError('Gagal menghapus foto.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const submit = async () => {
     if (!name.trim()) return setError('Nama lengkap wajib diisi.');
     if (!teacherCode.trim()) return setError('Kode guru wajib diisi.');
     if (makeAccount) {
@@ -379,8 +413,9 @@ function TeacherFormModal({
       if (password !== passwordConfirm) return setError('Konfirmasi password tidak cocok.');
     }
     setError('');
+    setPhotoError('');
 
-    onSave({
+    const payload: Record<string, unknown> = {
       name: name.trim(),
       teacher_code: teacherCode.trim(),
       gender: gender || undefined,
@@ -394,12 +429,65 @@ function TeacherFormModal({
       subject: subject || undefined,
       status,
       ...(makeAccount ? { password, password_confirmation: passwordConfirm } : {}),
-    });
+    };
+
+    // Saat edit: unggah foto dulu agar path-nya ikut tersimpan bersama data guru.
+    if (initial && pendingPhoto) {
+      setUploadingPhoto(true);
+      try {
+        const r = await teacherService.uploadPhoto(initial.id, pendingPhoto);
+        payload.photo_path = r.photo_path;
+        setPendingPhoto(null);
+        setPhotoPreview(null);
+      } catch {
+        setPhotoError('Gagal mengunggah foto. Ukuran maksimal 2 MB.');
+        setUploadingPhoto(false);
+        return;
+      }
+      setUploadingPhoto(false);
+    }
+
+    onSave(payload, !initial ? pendingPhoto : null);
   };
 
   return (
     <Modal title={initial ? 'Edit Guru' : 'Tambah Guru'} onClose={onClose} maxWidth="max-w-3xl">
       <div className="max-h-[78vh] space-y-6 overflow-y-auto p-6">
+        {/* Foto profil */}
+        <section>
+          <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-emerald-700">Foto Profil</h4>
+          <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
+            <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-white shadow-sm">
+              {photoPreview ?? (initial?.photo_path ? photoUrl(initial.photo_path) : null) ? (
+                <img
+                  src={photoPreview ?? (initial?.photo_path ? photoUrl(initial.photo_path) : '')}
+                  alt="Foto guru"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-sm font-bold text-slate-300">{nameInitials(name)}</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={chooseFile} />
+              <Button type="button" variant="outline" size="sm" disabled={uploadingPhoto} onClick={() => photoRef.current?.click()}>
+                {uploadingPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                Pilih Foto
+              </Button>
+              {(photoPreview ?? initial?.photo_path) && initial && (
+                <Button type="button" variant="ghost" size="sm" className="text-rose-600" disabled={uploadingPhoto} onClick={deletePhoto}>
+                  <Trash2 className="h-4 w-4" /> Hapus Foto
+                </Button>
+              )}
+            </div>
+            <p className="w-full text-xs text-slate-400 sm:w-auto sm:flex-1">
+              JPG, PNG, atau WebP — maksimal 2 MB.
+              {pendingPhoto && !initial ? ' Foto akan diunggah setelah guru disimpan.' : ''}
+            </p>
+          </div>
+          {photoError && <p className="mt-1 text-xs text-rose-600">{photoError}</p>}
+        </section>
+
         <section>
           <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-emerald-700">Data Personal</h4>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -515,7 +603,8 @@ function TeacherFormModal({
           <Button variant="outline" onClick={onClose}>
             Batal
           </Button>
-          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={submit}>
+          <Button className="bg-[#0D753F] hover:bg-[#075B30]" disabled={uploadingPhoto} onClick={submit}>
+            {uploadingPhoto && <Loader2 className="h-4 w-4 animate-spin" />}
             {initial ? 'Simpan Perubahan' : 'Simpan Guru'}
           </Button>
         </div>
@@ -863,7 +952,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: (m: str
           <Button variant="outline" onClick={onClose}>
             Tutup
           </Button>
-          <Button disabled={!file || importing} className="bg-emerald-600 hover:bg-emerald-700" onClick={handleImport}>
+          <Button disabled={!file || importing} className="bg-[#0D753F] hover:bg-[#075B30]" onClick={handleImport}>
             {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
             {importing ? 'Mengimpor...' : 'Import'}
           </Button>
@@ -943,8 +1032,15 @@ export default function Teachers() {
   const notify = (msg: string, tone: 'success' | 'error' = 'success') => setToast({ msg, tone });
 
   const save = useMutation({
-    mutationFn: (payload: Record<string, unknown>) =>
-      editing ? teacherService.update(editing.id, payload as never) : teacherService.create(payload as never),
+    mutationFn: async ({ payload, photo }: { payload: Record<string, unknown>; photo: File | null }) => {
+      if (editing) return teacherService.update(editing.id, payload as never);
+      // Guru baru: simpan dulu, lalu unggah foto agar path-nya tersimpan di DB.
+      const created: any = await teacherService.create(payload as never);
+      if (photo && created?.id) {
+        await teacherService.uploadPhoto(created.id, photo);
+      }
+      return created;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
       queryClient.invalidateQueries({ queryKey: ['teachers-stats'] });
@@ -991,13 +1087,13 @@ export default function Teachers() {
           <p className="mt-1 text-slate-500">Kelola data guru dan pembimbing tahfidz</p>
         </div>
         <div className="relative">
-          <Button className="rounded-xl bg-emerald-600 shadow-lg shadow-emerald-600/20 hover:bg-emerald-700" onClick={() => setMenuOpen(!menuOpen)}>
+          <Button className="rounded-xl bg-gradient-to-br from-[#075B30] to-[#0D753F] shadow-lg shadow-[#0D753F]/20 hover:from-[#064A27] hover:to-[#075B30]" onClick={() => setMenuOpen(!menuOpen)}>
             <Plus className="mr-2 h-4 w-4" /> Tambah Guru <ChevronDown className="ml-2 h-4 w-4" />
           </Button>
           {menuOpen && (
             <div className="absolute right-0 z-20 mt-2 w-56 rounded-2xl border bg-white p-2 shadow-xl">
               <button
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-slate-50"
+                className="flex w-full items-center gap-2 rounded-xl bg-gradient-to-br from-[#075B30] to-[#0D753F] px-3 py-2 text-sm text-white hover:from-[#064A27] hover:to-[#075B30]"
                 onClick={() => {
                   setMenuOpen(false);
                   setEditing(null);
@@ -1131,7 +1227,7 @@ export default function Teachers() {
             description="Tambahkan guru atau pembimbing untuk mulai mengelola program Tahfidz."
             action={
               <Button
-                className="bg-emerald-600 hover:bg-emerald-700"
+                className="bg-gradient-to-br from-[#075B30] to-[#0D753F] hover:from-[#064A27] hover:to-[#075B30]"
                 onClick={() => {
                   setEditing(null);
                   setShowForm(true);
@@ -1246,7 +1342,7 @@ export default function Teachers() {
       {showForm && (
         <TeacherFormModal
           initial={editing}
-          onSave={(payload) => save.mutate(payload)}
+          onSave={(payload, photo) => save.mutate({ payload, photo })}
           onClose={() => {
             setShowForm(false);
             setEditing(null);

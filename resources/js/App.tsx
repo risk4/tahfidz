@@ -13,6 +13,7 @@ import Classes from '@/pages/Classes';
 import TahfidzGroups from '@/pages/TahfidzGroups';
 import Submissions from '@/pages/Submissions';
 import Murajaah from '@/pages/Murajaah';
+import Quran, { SurahDetail } from '@/pages/Quran';
 import Progress from '@/pages/Progress';
 import Settings from '@/pages/Settings';
 import '../css/app.css';
@@ -176,6 +177,30 @@ function AppRoutes() {
           <PrivateRoute>
             {(user?.role === 'super_admin' || user?.role === 'teacher') ? (
               <Murajaah />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )}
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/surah-ayat"
+        element={
+          <PrivateRoute>
+            {(user?.role === 'super_admin' || user?.role === 'teacher') ? (
+              <Quran />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )}
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/surah/:id"
+        element={
+          <PrivateRoute>
+            {(user?.role === 'super_admin' || user?.role === 'teacher') ? (
+              <SurahDetail />
             ) : (
               <Navigate to="/dashboard" replace />
             )}

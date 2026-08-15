@@ -4,8 +4,32 @@
 @source '../../storage/framework/views/*.php';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Inter', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-inter: 'Inter', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-arabic: 'Amiri Quran', 'Noto Sans Arabic', 'Scheherazade New', 'Segoe UI', Tahoma, sans-serif;
+
+    /* ---- Shadcn/ui theme colors (Tailwind v4) ---- */
+    --color-background: hsl(var(--background));
+    --color-foreground: hsl(var(--foreground));
+    --color-card: hsl(var(--card));
+    --color-card-foreground: hsl(var(--card-foreground));
+    --color-popover: hsl(var(--popover));
+    --color-popover-foreground: hsl(var(--popover-foreground));
+    --color-primary: hsl(var(--primary));
+    --color-primary-foreground: hsl(var(--primary-foreground));
+    --color-secondary: hsl(var(--secondary));
+    --color-secondary-foreground: hsl(var(--secondary-foreground));
+    --color-muted: hsl(var(--muted));
+    --color-muted-foreground: hsl(var(--muted-foreground));
+    --color-accent: hsl(var(--accent));
+    --color-accent-foreground: hsl(var(--accent-foreground));
+    --color-destructive: hsl(var(--destructive));
+    --color-destructive-foreground: hsl(var(--destructive-foreground));
+    --color-border: hsl(var(--border));
+    --color-input: hsl(var(--input));
+    --color-ring: hsl(var(--ring));
 
     /* ---- Micro animations ---- */
     --animate-fade-up: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -15,11 +39,23 @@
     --animate-sparkle: sparkle 2.8s ease-in-out infinite;
     --animate-wiggle: wiggle 2.5s ease-in-out infinite;
     --animate-shake: shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    --animate-login-in: login-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 
     @keyframes fade-up {
         from {
             opacity: 0;
             transform: translateY(18px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes login-in {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
         }
         to {
             opacity: 1;
@@ -96,7 +132,7 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 161 94% 30%;
+    --primary: 149 80% 25%;
     --primary-foreground: 0 0% 100%;
     --secondary: 152 76% 90%;
     --secondary-foreground: 161 84% 27%;
@@ -119,7 +155,7 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 161 94% 30%;
+    --primary: 149 80% 25%;
     --primary-foreground: 0 0% 100%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -133,6 +169,16 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
   }
+}
+
+/* ---- Amiri Quran (gaya Uthmanic/Mushaf) — self-hosted, subset Arab ---- */
+@font-face {
+    font-family: 'Amiri Quran';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/amiri-quran-arabic.woff2') format('woff2');
+    unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
 }
 
 @layer base {
