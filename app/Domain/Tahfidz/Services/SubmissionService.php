@@ -2,6 +2,7 @@
 
 namespace App\Domain\Tahfidz\Services;
 
+use App\Domain\Notifications\Services\NotificationService;
 use App\Domain\People\Models\Student;
 use App\Domain\Tahfidz\Models\StudentAyahCoverage;
 use App\Domain\Tahfidz\Models\Submission;
@@ -15,6 +16,7 @@ class SubmissionService
 {
     public function __construct(
         private readonly ProgressService $progressService,
+        private readonly NotificationService $notifications,
     ) {
     }
 
@@ -49,6 +51,10 @@ class SubmissionService
         });
 
         $this->progressService->recompute($submission->student);
+
+        $this->notifications->send('setoran', $submission->student->user?->email, [
+            'nama' => $submission->student->name,
+        ], $submission->student_id);
 
         return $submission->load(['student', 'teacher', 'academicYear', 'surah']);
     }

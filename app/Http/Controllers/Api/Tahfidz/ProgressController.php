@@ -47,7 +47,7 @@ class ProgressController extends Controller
         }
 
         $query = StudentProgressSummary::query()
-            ->with('student:id,name,student_code,class_id');
+            ->with(['student:id,name,student_code,class_id', 'student.classRoom:id,name']);
 
         if ($user->isTeacher()) {
             $teacherId = $user->teacher?->id;
@@ -58,7 +58,44 @@ class ProgressController extends Controller
             $query->whereHas('student', fn ($q) => $q->where('class_id', $classId));
         }
 
-        return $query->orderByDesc('progress_percentage')->paginate(20);
+        if ($search = $request->string('search')->toString()) {
+            $query->whereHas('student', fn ($q) => $q
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('student_code', 'like', "%{$search}%")
+                ->orWhere('nis', 'like', "%{$search}%"));
+        }
+
+        $perPage = min(max($request->integer('per_page', 15), 5), 100);
+
+        return $query->orderByDesc('progress_percentage')->paginate($perPage)->withQueryString();
+    }
+
+    /** Statistik agregat progres (seluruh data sesuai scope role + filter). */
+    public function stats(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user->isSuperAdmin() && ! $user->isTeacher()) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        $query = StudentProgressSummary::query();
+
+        if ($user->isTeacher()) {
+            $teacherId = $user->teacher?->id;
+            $query->whereHas('student.tahfidzGroups', fn ($q) => $q->where('teacher_id', $teacherId));
+        }
+
+        if ($classId = $request->integer('class_id')) {
+            $query->whereHas('student', fn ($q) => $q->where('class_id', $classId));
+        }
+
+        return response()->json([
+            'total_students' => (int) $query->count(),
+            'avg_progress' => round((float) $query->avg('progress_percentage'), 1),
+            'avg_score' => round((float) $query->avg('average_score'), 1),
+            'total_juz' => (int) $query->sum('total_juz_completed'),
+        ]);
     }
 
     private function authorizeShow(User $user, Student $student): void

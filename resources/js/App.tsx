@@ -14,6 +14,7 @@ import TahfidzGroups from '@/pages/TahfidzGroups';
 import Submissions from '@/pages/Submissions';
 import Murajaah from '@/pages/Murajaah';
 import Progress from '@/pages/Progress';
+import Settings from '@/pages/Settings';
 import '../css/app.css';
 
 const queryClient = new QueryClient({
@@ -186,6 +187,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <Progress />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <PrivateRoute>
+            {user?.role === 'super_admin' ? <Settings /> : <Navigate to="/dashboard" replace />}
           </PrivateRoute>
         }
       />

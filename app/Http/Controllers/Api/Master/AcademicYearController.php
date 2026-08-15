@@ -14,7 +14,9 @@ class AcademicYearController extends Controller
     {
         $this->authorize('viewAny', AcademicYear::class);
 
-        return AcademicYear::orderByDesc('start_date')->paginate(20);
+        $perPage = min(max($request->integer('per_page', 20), 5), 100);
+
+        return AcademicYear::orderByDesc('start_date')->paginate($perPage);
     }
 
     public function store(StoreAcademicYearRequest $request)

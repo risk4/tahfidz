@@ -1,5 +1,21 @@
 import api from '@/lib/api';
-import type { MemorizationStatus, User, LoginResponse } from '@/types';
+import type {
+  ActivityLog,
+  AppSettings,
+  DashboardOverview,
+  DashboardRange,
+  MemorizationStatus,
+  PaginatedResponse,
+  ProgressStats,
+  SessionInfo,
+  TeacherDetail,
+  TeacherPerformancePoint,
+  TeacherPerformanceRange,
+  TeacherStats,
+  User,
+  LoginResponse,
+  UsersResponse,
+} from '@/types';
 
 export const authService = {
   async login(email: string, password: string): Promise<LoginResponse> {
@@ -45,22 +61,51 @@ export const academicYearService = {
 };
 
 export const teacherService = {
-  async list(params?: { page?: number; per_page?: number; search?: string }) {
+  async list(params?: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    status?: string;
+    subject?: string;
+    role?: string;
+    class_id?: number;
+    halaqah_id?: number;
+  }) {
     const response = await api.get('/teachers', { params });
     return response.data;
   },
 
+  async stats() {
+    const response = await api.get<TeacherStats>('/teachers/stats');
+    return response.data;
+  },
+
   async get(id: number) {
-    const response = await api.get(`/teachers/${id}`);
+    const response = await api.get<TeacherDetail>(`/teachers/${id}`);
+    return response.data;
+  },
+
+  async performance(id: number, range: TeacherPerformanceRange = '30d') {
+    const response = await api.get<TeacherPerformancePoint[]>(`/teachers/${id}/performance`, { params: { range } });
     return response.data;
   },
 
   async create(data: {
     teacher_code: string;
     name: string;
+    gender?: string;
     nip?: string;
+    nuptk?: string;
+    birth_place?: string;
+    birth_date?: string;
+    photo_path?: string;
     phone?: string;
     email?: string;
+    address?: string;
+    subject?: string;
+    status?: string;
+    password?: string;
+    password_confirmation?: string;
   }) {
     const response = await api.post('/teachers', data);
     return response.data;
@@ -69,10 +114,19 @@ export const teacherService = {
   async update(id: number, data: Partial<{
     teacher_code: string;
     name: string;
+    gender: string;
     nip: string;
+    nuptk: string;
+    birth_place: string;
+    birth_date: string;
+    photo_path: string;
     phone: string;
     email: string;
+    address: string;
+    subject: string;
     status: string;
+    password: string;
+    password_confirmation: string;
   }>) {
     const response = await api.put(`/teachers/${id}`, data);
     return response.data;
@@ -80,6 +134,54 @@ export const teacherService = {
 
   async delete(id: number) {
     await api.delete(`/teachers/${id}`);
+  },
+
+  async export(params?: { search?: string; status?: string; subject?: string; role?: string; class_id?: number; halaqah_id?: number; format?: 'csv' | 'xlsx' }) {
+    const token = localStorage.getItem('token');
+    const format = params?.format ?? 'csv';
+    const query = params
+      ? '?' + new URLSearchParams(
+          Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
+        ).toString()
+      : '';
+    const response = await fetch(`/api/teachers/export${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Gagal mengunduh data export.');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `export_guru_${new Date().toISOString().slice(0, 10)}.${format === 'xlsx' ? 'xlsx' : 'csv'}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  async downloadTemplate(format: 'csv' | 'xlsx' = 'csv') {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`/api/teachers/import-template?format=${format}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Gagal mengunduh template.');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `template_import_guru.${format === 'xlsx' ? 'xlsx' : 'csv'}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  async import(file: File, mode: 'update' | 'insert_only' = 'update'): Promise<{ message: string; imported: number; skipped: Array<{ row: number; data: string; errors: string[] }> }> {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('mode', mode);
+    const response = await api.post('/teachers/import', form);
+    return response.data;
   },
 };
 
@@ -243,6 +345,11 @@ export const quranService = {
   async surahs(params?: { juz_number?: number }) {
     const response = await api.get('/quran/surahs', { params });
     return response.data;
+  },
+
+  async juz() {
+    const response = await api.get('/quran/juz');
+    return response.data as Array<{ id: number; juz_number: number }>;
   },
 
   async ayahs(surahId: number, params?: { from?: number; to?: number; paged?: boolean; per_page?: number }) {
@@ -414,13 +521,94 @@ export const murajaahService = {
 };
 
 export const progressService = {
-  async list(params?: { page?: number; per_page?: number; class_id?: number }) {
+  async list(params?: { page?: number; per_page?: number; class_id?: number; search?: string }) {
     const response = await api.get('/progress', { params });
+    return response.data;
+  },
+
+  async stats(params?: { class_id?: number }) {
+    const response = await api.get<ProgressStats>('/progress/stats', { params });
     return response.data;
   },
 
   async show(studentId: number) {
     const response = await api.get(`/progress/${studentId}`);
+    return response.data;
+  },
+};
+
+export const dashboardService = {
+  async overview(range: DashboardRange = '30d') {
+    const response = await api.get('/dashboard/overview', { params: { range } });
+    return response.data as DashboardOverview;
+  },
+};
+
+export type SettingsGroup = keyof AppSettings;
+
+export const settingsService = {
+  async all(): Promise<AppSettings> {
+    const response = await api.get<AppSettings>('/settings');
+    return response.data;
+  },
+
+  async updateGroup(group: SettingsGroup, values: Record<string, unknown>) {
+    const response = await api.put(`/settings/${group}`, values);
+    return response.data as { group: string; values: AppSettings[typeof group] };
+  },
+
+  async uploadLogo(key: string, file: File): Promise<{ path: string }> {
+    const formData = new FormData();
+    formData.append('key', key);
+    formData.append('file', file);
+    const response = await api.post('/settings/logo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  async deleteLogo(key: string): Promise<{ message: string }> {
+    const response = await api.delete('/settings/logo', { data: { key } });
+    return response.data;
+  },
+
+  async users(params?: { page?: number; per_page?: number }): Promise<UsersResponse> {
+    const response = await api.get<UsersResponse>('/settings/users', { params });
+    return response.data;
+  },
+
+  async toggleUserActive(id: number): Promise<User> {
+    const response = await api.post(`/settings/users/${id}/toggle-active`);
+    return response.data;
+  },
+
+  async activityLogs(params?: { page?: number; per_page?: number }): Promise<PaginatedResponse<ActivityLog>> {
+    const response = await api.get<PaginatedResponse<ActivityLog>>('/settings/activity-logs', { params });
+    return response.data;
+  },
+
+  async sessions(): Promise<SessionInfo[]> {
+    const response = await api.get<SessionInfo[]>('/settings/sessions');
+    return response.data;
+  },
+
+  async revokeSession(id: number) {
+    const response = await api.delete(`/settings/sessions/${id}`);
+    return response.data;
+  },
+
+  async logoutAll(): Promise<{ message: string }> {
+    const response = await api.post('/settings/logout-all');
+    return response.data;
+  },
+
+  async backupNow(): Promise<{ group: string; values: AppSettings['backup'] }> {
+    const response = await api.post('/settings/backup');
+    return response.data;
+  },
+
+  async testEmail(to?: string): Promise<{ status: 'sent' | 'failed'; message: string }> {
+    const response = await api.post('/settings/test-email', { to });
     return response.data;
   },
 };

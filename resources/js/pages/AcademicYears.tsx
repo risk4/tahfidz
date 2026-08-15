@@ -64,16 +64,16 @@ export default function AcademicYears() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-3xl bg-gradient-to-r from-amber-500 to-orange-500 p-6 text-white shadow-xl shadow-orange-500/20 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-amber-100">Kalender Akademik</p>
-          <h1 className="text-2xl font-black sm:text-3xl">Tahun Ajaran</h1>
-          <p className="mt-1 text-sm text-orange-50">Kelola periode belajar dan pilih tahun ajaran aktif.</p>
+          <p className="text-sm font-semibold text-emerald-600">Kalender Akademik</p>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900">Tahun Ajaran</h1>
+          <p className="mt-1 text-slate-500">Kelola periode belajar dan pilih tahun ajaran aktif.</p>
         </div>
-        {!showForm && <Button className="bg-white text-orange-700 hover:bg-orange-50" onClick={() => setShowForm(true)}><Plus className="w-4 h-4 mr-2" /> Tambah Tahun</Button>}
+        {!showForm && <Button onClick={() => setShowForm(true)}><Plus className="w-4 h-4 mr-2" /> Tambah Tahun</Button>}
       </div>
       {showForm && (
-        <Card className="border-0 shadow-xl">
+        <Card className="overflow-hidden">
           <CardHeader><CardTitle>{editingId ? 'Edit' : 'Tambah'} Tahun Ajaran</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -90,9 +90,9 @@ export default function AcademicYears() {
           </CardContent>
         </Card>
       )}
-      <Card className="overflow-hidden border-0 shadow-xl">
+      <Card className="overflow-hidden">
         <CardContent className="p-0">
-          {isLoading ? <div className="p-8 text-center text-gray-500">Memuat...</div> : (
+          {isLoading ? <div className="space-y-3 p-5">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100" />)}</div> : (
             <div className="overflow-x-auto">
             <table className="w-full min-w-[760px]">
               <thead className="bg-slate-50">
@@ -106,7 +106,7 @@ export default function AcademicYears() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {years.map((year: AcademicYear) => (
-                  <tr key={year.id} className="hover:bg-orange-50/50">
+                  <tr key={year.id} className="hover:bg-emerald-50/40">
                     <td className="px-4 py-3 text-sm font-semibold text-slate-900">{year.name}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{formatDate(year.start_date)}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{formatDate(year.end_date)}</td>

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Tahfidz\Services;
 
+use App\Domain\Notifications\Services\NotificationService;
 use App\Domain\Tahfidz\Models\Murajaah;
 
 /**
@@ -14,6 +15,10 @@ use App\Domain\Tahfidz\Models\Murajaah;
  */
 class MurajaahService
 {
+    public function __construct(private readonly NotificationService $notifications)
+    {
+    }
+
     public function calculateFinalScore(array $data): float
     {
         $scores = [
@@ -31,7 +36,13 @@ class MurajaahService
         $data = $this->normalize($data);
         $data['final_score'] = $this->calculateFinalScore($data);
 
-        return Murajaah::create($data);
+        $murajaah = Murajaah::create($data);
+
+        $this->notifications->send('murajaah', $murajaah->student?->user?->email, [
+            'nama' => $murajaah->student?->name,
+        ], $murajaah->student_id);
+
+        return $murajaah;
     }
 
     public function update(Murajaah $murajaah, array $data): Murajaah

@@ -15,8 +15,17 @@ class Teacher extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'teacher_code', 'name', 'nip', 'phone', 'email', 'status',
+        'user_id', 'teacher_code', 'name', 'gender', 'nip', 'nuptk',
+        'birth_place', 'birth_date', 'photo_path', 'phone', 'email',
+        'address', 'subject', 'status',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'birth_date' => 'date',
+        ];
+    }
 
     public function user()
     {

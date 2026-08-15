@@ -2,6 +2,7 @@
 
 namespace App\Domain\Tahfidz\Services;
 
+use App\Domain\Notifications\Services\NotificationService;
 use App\Domain\People\Models\Student;
 use App\Domain\Quran\Models\QuranAyah;
 use App\Domain\Tahfidz\Models\StudentAyahCoverage;
@@ -18,6 +19,10 @@ use Illuminate\Support\Facades\DB;
  */
 class ProgressService
 {
+    public function __construct(private readonly NotificationService $notifications)
+    {
+    }
+
     /**
      * Hitung ulang & simpan ringkasan progres untuk satu siswa.
      */
@@ -41,7 +46,7 @@ class ProgressService
 
         $progress = $totalAyahQuran > 0 ? round(($totalCovered / $totalAyahQuran) * 100, 2) : 0;
 
-        return StudentProgressSummary::updateOrCreate(
+        $summary = StudentProgressSummary::updateOrCreate(
             ['student_id' => $student->id],
             [
                 'total_ayah_covered' => $totalCovered,
@@ -53,6 +58,13 @@ class ProgressService
                 'updated_at' => now(),
             ]
         );
+
+        // Notifikasi sekali-saja saat target hafalan (juz) tercapai.
+        if ($student->memorization_target && (int) $juzCompleted >= (int) $student->memorization_target) {
+            $this->notifications->notifyTargetAchieved($student);
+        }
+
+        return $summary;
     }
 
     /**

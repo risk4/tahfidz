@@ -19,7 +19,7 @@ class TahfidzGroupController extends Controller
             $query->where('teacher_id', $request->user()->teacher?->id);
         }
 
-        return $query->paginate(20);
+        return $query->paginate(min(max($request->integer('per_page', 20), 5), 100));
     }
 
     public function store(StoreTahfidzGroupRequest $request)

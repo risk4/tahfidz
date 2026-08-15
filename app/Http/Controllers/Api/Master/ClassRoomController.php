@@ -13,13 +13,13 @@ class ClassRoomController extends Controller
     {
         $this->authorize('viewAny', ClassRoom::class);
 
-        $query = ClassRoom::query()->with('homeroomTeacher');
+        $query = ClassRoom::query()->with(['homeroomTeacher', 'academicYear']);
 
         if ($academicYearId = $request->integer('academic_year_id')) {
             $query->where('academic_year_id', $academicYearId);
         }
 
-        return $query->orderBy('name')->paginate(20);
+        return $query->orderBy('name')->paginate(min(max($request->integer('per_page', 20), 5), 100));
     }
 
     public function store(StoreClassRoomRequest $request)

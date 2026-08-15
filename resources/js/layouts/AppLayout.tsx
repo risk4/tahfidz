@@ -1,14 +1,10 @@
 import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
 import {
   LayoutDashboard,
   Users,
   GraduationCap,
-  School,
-  BookOpen,
-  Calendar,
   LogOut,
   Menu,
   X,
@@ -18,8 +14,11 @@ import {
   BookMarked,
   PanelLeftClose,
   PanelLeftOpen,
+  Settings,
+  ChevronDown,
+  UserRound,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -27,14 +26,12 @@ interface AppLayoutProps {
 
 const menuItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['super_admin', 'teacher', 'student'] },
-  { path: '/academic-years', label: 'Tahun Ajaran', icon: Calendar, roles: ['super_admin'] },
   { path: '/teachers', label: 'Guru', icon: Users, roles: ['super_admin'] },
   { path: '/students', label: 'Siswa', icon: GraduationCap, roles: ['super_admin', 'teacher'] },
-  { path: '/classes', label: 'Kelas', icon: School, roles: ['super_admin'] },
-  { path: '/tahfidz-groups', label: 'Kelompok Tahfidz', icon: BookOpen, roles: ['super_admin', 'teacher'] },
   { path: '/submissions', label: 'Setoran Hafalan', icon: ClipboardList, roles: ['super_admin', 'teacher'] },
   { path: '/murajaah', label: 'Murajaah', icon: BookMarked, roles: ['super_admin', 'teacher'] },
   { path: '/progress', label: 'Progress', icon: BarChart3, roles: ['super_admin', 'teacher', 'student'] },
+  { path: '/settings', label: 'Pengaturan', icon: Settings, roles: ['super_admin'] },
 ];
 
 export default function AppLayout({ children }: AppLayoutProps) {
@@ -54,10 +51,34 @@ export default function AppLayout({ children }: AppLayoutProps) {
     });
   };
 
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
   const handleLogout = async () => {
+    setProfileOpen(false);
     await logout();
     navigate('/login');
   };
+
+  const roleLabel = user?.role === 'super_admin' ? 'Admin' : user?.role === 'teacher' ? 'Guru' : 'Siswa';
+  const initials = (user?.name ?? '?')
+    .trim()
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 
   const filteredMenu = menuItems.filter((item) => user && item.roles.includes(user.role));
 
@@ -147,15 +168,42 @@ export default function AppLayout({ children }: AppLayoutProps) {
               {sidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
             </button>
           </div>
-          <div className="flex items-center gap-4 ml-auto">
-            <div className="hidden text-right text-sm sm:block">
-              <span className="block font-semibold text-slate-900">{user?.name}</span>
-              <span className="text-slate-500">{user?.role === 'super_admin' ? 'Admin' : user?.role === 'teacher' ? 'Guru' : 'Siswa'}</span>
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
+          <div className="ml-auto" ref={profileRef}>
+            <button
+              onClick={() => setProfileOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={profileOpen}
+              className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white py-1.5 pl-1.5 pr-2.5 shadow-sm transition-colors hover:bg-slate-50"
+            >
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
+                {initials || <UserRound className="h-4 w-4" />}
+              </span>
+              <span className="hidden text-left sm:block">
+                <span className="block max-w-[140px] truncate text-sm font-semibold leading-tight text-slate-900">{user?.name}</span>
+                <span className="block text-xs leading-tight text-slate-500">{roleLabel}</span>
+              </span>
+              <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {profileOpen && (
+              <div
+                role="menu"
+                className="absolute right-4 z-40 mt-2 w-64 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl sm:right-6"
+              >
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <p className="text-sm font-bold text-slate-900">{user?.name}</p>
+                  <p className="truncate text-xs text-slate-500">{user?.email}</p>
+                </div>
+                <div className="p-1.5">
+                  <button
+                    role="menuitem"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50"
+                  >
+                    <LogOut className="h-4 w-4" /> Logout
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </header>
 
