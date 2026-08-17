@@ -392,7 +392,7 @@ function RecentSubmissions({ items, loading }: { items: DashboardOverview['recen
           Lihat Semua <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4 hidden overflow-x-auto md:block">
         <table className="w-full min-w-[560px] text-sm">
           <thead>
             <tr className="border-y border-slate-100 bg-slate-50/60 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
@@ -444,6 +444,40 @@ function RecentSubmissions({ items, loading }: { items: DashboardOverview['recen
           </tbody>
         </table>
       </div>
+
+      {/* Mobile: tampilan kartu */}
+      <div className="divide-y divide-slate-50 md:hidden">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-start justify-between gap-3 px-5 py-3.5">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-2/3" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+              <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
+            </div>
+          ))
+        ) : items.length === 0 ? (
+          <EmptyState title="Belum ada aktivitas" description="Belum terdapat aktivitas Tahfidz pada periode ini." />
+        ) : (
+          items.map((s) => (
+            <div key={s.id} className="flex items-start justify-between gap-3 px-5 py-3.5">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-900">{s.student_name}</p>
+                <p className="mt-0.5 truncate text-xs text-slate-500">
+                  {s.surah}
+                  {s.ayah_range ? ` · ayat ${s.ayah_range}` : ''} · {s.page_count ?? '-'} halaman
+                </p>
+                <p className="mt-0.5 truncate text-xs text-slate-400">
+                  {s.teacher_name ? `${s.teacher_name} · ` : ''}
+                  {s.time || s.date || '-'}
+                </p>
+              </div>
+              <StatusBadge status={s.status} />
+            </div>
+          ))
+        )}
+      </div>
     </Card>
   );
 }
@@ -486,7 +520,8 @@ function AttentionStudents({ items, loading }: { items: DashboardOverview['atten
                 </span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-900">{s.name}</p>
-                  <p className="truncate text-xs text-slate-500">
+                  {/* Biarkan pesan membungkus (line-clamp) agar min-content-nya tidak memaksa kartu/grid melebar di layar sempit. */}
+                  <p className="line-clamp-2 text-xs text-slate-500">
                     {s.message}
                     {s.class_name ? ` · ${s.class_name}` : ''}
                   </p>
@@ -512,7 +547,7 @@ function ClassPerformance({ items, loading }: { items: DashboardOverview['class_
           Lihat Performa <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4 hidden overflow-x-auto md:block">
         <table className="w-full min-w-[520px] text-sm">
           <thead>
             <tr className="border-y border-slate-100 bg-slate-50/60 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
@@ -561,6 +596,36 @@ function ClassPerformance({ items, loading }: { items: DashboardOverview['class_
           </tbody>
         </table>
       </div>
+
+      {/* Mobile: tampilan kartu */}
+      <div className="divide-y divide-slate-50 md:hidden">
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="space-y-2 px-5 py-3.5">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-1.5 w-full rounded-full" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          ))
+        ) : items.length === 0 ? (
+          <EmptyState title="Belum ada kelas" description="Belum terdapat data performa kelas." />
+        ) : (
+          items.map((c) => (
+            <div key={c.id} className="px-5 py-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="min-w-0 truncate text-sm font-semibold text-slate-900">{c.name}</p>
+                <span className="shrink-0 text-xs font-semibold text-slate-700">{c.target_percentage}%</span>
+              </div>
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, c.target_percentage)}%` }} />
+              </div>
+              <p className="mt-1.5 text-xs text-slate-400">
+                {c.students} santri · {c.submissions} setoran · {c.murajaahs} muraja'ah
+              </p>
+            </div>
+          ))
+        )}
+      </div>
     </Card>
   );
 }
@@ -569,7 +634,7 @@ function TopStudents({ items, loading }: { items: DashboardOverview['top_student
   const medals = ['bg-amber-100 text-amber-700', 'bg-slate-200 text-slate-600', 'bg-orange-100 text-orange-700'];
 
   return (
-    <Card>
+    <Card className="min-w-0">
       <SectionTitle
         title="Perkembangan Terbaik"
         subtitle="Santri dengan skor progres & konsistensi tertinggi"
@@ -626,7 +691,7 @@ function TeacherActivity({ data, loading }: { data?: DashboardOverview['teacher_
   ];
 
   return (
-    <Card className="p-0">
+    <Card className="min-w-0 p-0">
       <div className="px-5 pt-5">
         <SectionTitle title="Aktivitas Pembimbing" subtitle="Statistik pembimbing aktif" />
         <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -639,7 +704,7 @@ function TeacherActivity({ data, loading }: { data?: DashboardOverview['teacher_
           ))}
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[480px] text-sm">
           <thead>
             <tr className="border-y border-slate-100 bg-slate-50/60 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
@@ -685,6 +750,48 @@ function TeacherActivity({ data, loading }: { data?: DashboardOverview['teacher_
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile: tampilan kartu */}
+      <div className="divide-y divide-slate-50 md:hidden">
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-5 py-3.5">
+              <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-2/3" />
+                <Skeleton className="h-3 w-1/3" />
+              </div>
+            </div>
+          ))
+        ) : data.teachers.length === 0 ? (
+          <EmptyState title="Belum ada pembimbing" description="Belum terdapat data aktivitas pembimbing." />
+        ) : (
+          data.teachers.map((t) => (
+            <div key={t.id} className="px-5 py-3.5">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-sky-50 text-[10px] font-bold text-sky-700">
+                  {nameInitials(t.name)}
+                </span>
+                <p className="min-w-0 truncate text-sm font-semibold text-slate-900">{t.name}</p>
+              </div>
+              <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg bg-slate-50 py-1.5">
+                  <p className="text-sm font-bold text-slate-900">{t.students}</p>
+                  <p className="text-[10px] text-slate-500">Santri</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 py-1.5">
+                  <p className="text-sm font-bold text-slate-900">{t.submissions}</p>
+                  <p className="text-[10px] text-slate-500">Setoran</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 py-1.5">
+                  <p className="text-sm font-bold text-slate-900">{t.murajaahs}</p>
+                  <p className="text-[10px] text-slate-500">Muraja'ah</p>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </Card>
   );
@@ -832,22 +939,6 @@ export default function Dashboard() {
             <CalendarDays className="h-4 w-4 text-emerald-600" />
             {todayLabel}
           </span>
-          {!isStudent && (
-            <>
-              <Link
-                to="/submissions"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-[#075B30] to-[#0D753F] px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#0D753F]/20 transition-colors hover:from-[#064A27] hover:to-[#075B30]"
-              >
-                <Plus className="h-4 w-4" /> Tambah Setoran
-              </Link>
-              <Link
-                to="/murajaah"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-[#075B30] to-[#0D753F] px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#0D753F]/20 transition-colors hover:from-[#064A27] hover:to-[#075B30]"
-              >
-                <BookMarked className="h-4 w-4" /> Tambah Muraja'ah
-              </Link>
-            </>
-          )}
         </div>
       </div>
 
@@ -951,7 +1042,7 @@ export default function Dashboard() {
                 title="Perkembangan Hafalan"
                 subtitle="Aktivitas hafalan dalam periode terpilih"
                 right={
-                  <div className="flex gap-1 rounded-xl border border-slate-100 bg-slate-50 p-1">
+                  <div className="flex flex-wrap gap-1 rounded-xl border border-slate-100 bg-slate-50 p-1">
                     {RANGES.map((r) => (
                       <button
                         key={r.id}

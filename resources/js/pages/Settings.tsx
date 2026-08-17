@@ -200,11 +200,11 @@ function Pagination({
   total?: number;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3">
       <p className="text-xs text-slate-500">
         {total !== undefined ? `${total.toLocaleString('id-ID')} data` : `Halaman ${page} dari ${lastPage}`}
       </p>
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center justify-end gap-1">
         <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
           <ChevronLeft className="h-4 w-4" /> Sebelumnya
         </Button>
@@ -689,7 +689,7 @@ function UsersSection() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[720px]">
             <thead className="bg-slate-50">
               <tr>
@@ -761,6 +761,60 @@ function UsersSection() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile: tampilan kartu */}
+        <div className="divide-y divide-slate-100 md:hidden">
+          {isLoading ? (
+            <div className="p-6 text-center text-sm text-slate-500">Memuat...</div>
+          ) : users.length === 0 ? (
+            <div className="p-6 text-center text-sm text-slate-500">Belum ada pengguna.</div>
+          ) : (
+            users.map((u) => (
+              <div key={u.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
+                      {u.name?.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">{u.name}</p>
+                      <p className="truncate text-xs text-slate-500">{u.email}</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={u.is_active ? 'outline' : 'default'}
+                    disabled={toggle.isPending}
+                    onClick={() => toggle.mutate(u.id)}
+                  >
+                    {u.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                  </Button>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      u.role === 'super_admin'
+                        ? 'bg-sky-100 text-sky-700'
+                        : u.role === 'teacher'
+                          ? 'bg-violet-100 text-violet-700'
+                          : 'bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {roleLabel(u.role)}
+                  </span>
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      u.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {u.is_active ? 'Aktif' : 'Nonaktif'}
+                  </span>
+                  <span className="text-xs text-slate-400">Login terakhir: {fmtDateTime(u.last_login_at)}</span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
         <Pagination page={page} lastPage={lastPage} onChange={setPage} total={total} />
       </Card>
@@ -1019,58 +1073,99 @@ function ClassesTab() {
       {isLoading ? (
         <div className="p-8 text-center text-sm text-slate-500">Memuat...</div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px]">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Nama</th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Tingkat</th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Wali Kelas</th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Tahun Ajaran</th>
-                <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-500">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {classes.length === 0 ? (
+        <>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[640px]">
+              <thead className="bg-slate-50">
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">Belum ada kelas.</td>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Nama</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Tingkat</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Wali Kelas</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Tahun Ajaran</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-500">Aksi</th>
                 </tr>
-              ) : (
-                classes.map((c) => (
-                  <tr key={c.id} className="hover:bg-emerald-50/40">
-                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">{c.name}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{c.grade}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{c.homeroom_teacher?.name || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{c.academic_year?.name || '-'}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          title="Edit"
-                          onClick={() => { setEditing(c); setShowForm(true); }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="text-rose-600 hover:bg-rose-50"
-                          title="Hapus"
-                          onClick={() => {
-                            if (window.confirm(`Hapus kelas "${c.name}"?`)) remove.mutate(c.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {classes.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">Belum ada kelas.</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  classes.map((c) => (
+                    <tr key={c.id} className="hover:bg-emerald-50/40">
+                      <td className="px-4 py-3 text-sm font-semibold text-slate-900">{c.name}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{c.grade}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{c.homeroom_teacher?.name || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{c.academic_year?.name || '-'}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            title="Edit"
+                            onClick={() => { setEditing(c); setShowForm(true); }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-rose-600 hover:bg-rose-50"
+                            title="Hapus"
+                            onClick={() => {
+                              if (window.confirm(`Hapus kelas "${c.name}"?`)) remove.mutate(c.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: tampilan kartu */}
+          <div className="divide-y divide-slate-100 md:hidden">
+            {classes.length === 0 ? (
+              <div className="p-6 text-center text-sm text-slate-500">Belum ada kelas.</div>
+            ) : (
+              classes.map((c) => (
+                <div key={c.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">{c.name}</p>
+                      <p className="truncate text-xs text-slate-500">{c.academic_year?.name || '-'}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                      Tingkat {c.grade}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Wali Kelas: <b className="text-slate-900">{c.homeroom_teacher?.name || '-'}</b>
+                  </p>
+                  <div className="mt-3 flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => { setEditing(c); setShowForm(true); }}>
+                      <Pencil className="h-4 w-4" /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="ml-auto"
+                      onClick={() => {
+                        if (window.confirm(`Hapus kelas "${c.name}"?`)) remove.mutate(c.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" /> Hapus
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
       )}
       {showForm && (
         <ClassFormModal
@@ -1281,7 +1376,8 @@ function AcademicYearsSection() {
         {isLoading ? (
           <div className="p-8 text-center text-sm text-slate-500">Memuat...</div>
         ) : (
-          <div className="overflow-x-auto">
+        <>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[640px]">
               <thead className="bg-slate-50">
                 <tr>
@@ -1343,6 +1439,54 @@ function AcademicYearsSection() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile: tampilan kartu */}
+          <div className="divide-y divide-slate-100 md:hidden">
+            {years.length === 0 ? (
+              <div className="p-6 text-center text-sm text-slate-500">Belum ada tahun ajaran.</div>
+            ) : (
+              years.map((year) => (
+                <div key={year.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">{year.name}</p>
+                      <p className="truncate text-xs text-slate-500">
+                        {formatDate(year.start_date)} – {formatDate(year.end_date)}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        year.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {year.is_active ? 'Aktif' : 'Nonaktif'}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    {!year.is_active && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={activate.isPending}
+                        onClick={() => activate.mutate(year.id)}
+                      >
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Aktifkan
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto"
+                      onClick={() => { setEditing(year); setShowForm(true); }}
+                    >
+                      <Pencil className="h-4 w-4" /> Edit
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
         )}
       </Card>
       {showForm && (
@@ -1473,7 +1617,7 @@ function QuranSection() {
           <div className="p-8 text-center text-sm text-slate-500">Memuat...</div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[560px]">
                 <thead className="bg-slate-50">
                   <tr>
@@ -1505,6 +1649,29 @@ function QuranSection() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile: tampilan kartu */}
+            <div className="divide-y divide-slate-100 md:hidden">
+              {pageItems.length === 0 ? (
+                <div className="p-6 text-center text-sm text-slate-500">Surat tidak ditemukan.</div>
+              ) : (
+                pageItems.map((s) => (
+                  <div key={s.id} className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">{s.name_latin}</p>
+                        <p className="truncate text-xs text-slate-400">{s.name_arabic}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                        No. {s.surah_number}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600">{s.translation || '-'}</p>
+                    <p className="mt-1 text-xs text-slate-400">{s.total_ayahs} ayat</p>
+                  </div>
+                ))
+              )}
             </div>
             <Pagination page={page} lastPage={lastPage} onChange={setPage} total={filtered.length} />
           </>
@@ -2081,7 +2248,7 @@ function SecuritySection() {
               onCheckedChange={(checked) => setForm((f) => ({ ...(f ?? (base as AppSettings['security'])), login_notification: checked }))}
             />
           </div>
-          <div className="flex gap-2 border-t border-slate-100 pt-4">
+          <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
             <Button onClick={save} disabled={!form || saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Simpan Perubahan
@@ -2445,7 +2612,7 @@ function LogsSection() {
     <div className="space-y-5">
       <SectionHeader title="Log Aktivitas" subtitle="Riwayat aktivitas pengguna" />
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[680px]">
             <thead className="bg-slate-50">
               <tr>
@@ -2487,6 +2654,35 @@ function LogsSection() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile: tampilan kartu */}
+        <div className="divide-y divide-slate-100 md:hidden">
+          {isLoading ? (
+            <div className="p-6 text-center text-sm text-slate-500">Memuat...</div>
+          ) : logs.length === 0 ? (
+            <div className="p-6 text-center text-sm text-slate-500">Belum ada aktivitas tercatat.</div>
+          ) : (
+            logs.map((log) => (
+              <div key={log.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{log.user_name || 'Sistem'}</p>
+                    {log.user_email && <p className="truncate text-xs text-slate-500">{log.user_email}</p>}
+                  </div>
+                  <span className="inline-flex shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                    Berhasil
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-slate-600">
+                  {actionLabel(log.action)} <span className="text-slate-400">({modelLabel(log.model)})</span>
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {fmtDateTime(log.created_at)} · IP {log.ip_address || '-'}
+                </p>
+              </div>
+            ))
+          )}
         </div>
         <Pagination page={page} lastPage={lastPage} onChange={setPage} total={total} />
       </Card>

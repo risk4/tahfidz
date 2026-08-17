@@ -6,7 +6,6 @@ import type { PaginatedResponse, QuranAyah, QuranStatistics, QuranSurah } from '
 import {
   ArrowLeft,
   ArrowRight,
-  BookMarked,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -156,8 +155,12 @@ function PlaceBadge({ place }: { place?: string | null }) {
 
 function SurahCard({ s }: { s: QuranSurah }) {
   return (
-    <Card className="group rounded-2xl border-slate-200 shadow-sm transition-all duration-200 hover:border-[#0D753F] hover:shadow-md">
-      <CardContent className="p-5">
+    <Link
+      to={`/surah/${s.id}`}
+      aria-label={`Lihat ayat ${s.name_latin}`}
+      className="group block rounded-2xl border border-slate-200 bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-[#0D753F] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D753F]/40"
+    >
+      <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#E8F5EE] text-sm font-bold text-[#0D753F]">
@@ -181,15 +184,8 @@ function SurahCard({ s }: { s: QuranSurah }) {
             </span>
           )}
         </div>
-        <Link
-          to={`/surah/${s.id}`}
-          className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#0D753F] transition-colors hover:text-[#075B30]"
-          aria-label={`Lihat ayat ${s.name_latin}`}
-        >
-          <BookMarked className="h-4 w-4" aria-hidden="true" /> Lihat Ayat
-        </Link>
-      </CardContent>
-    </Card>
+      </div>
+    </Link>
   );
 }
 

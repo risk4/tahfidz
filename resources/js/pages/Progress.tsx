@@ -593,7 +593,8 @@ export default function Progress() {
         ) : summaries.length === 0 ? (
           <EmptyState title="Belum ada data progress" description="Belum terdapat data progress hafalan pada filter ini." />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[960px] text-sm">
               <thead className="bg-slate-50">
                 <tr className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
@@ -662,6 +663,70 @@ export default function Progress() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile: tampilan kartu */}
+          <div className="divide-y divide-slate-100 md:hidden">
+            {summaries.map((summary) => (
+              <div key={summary.student_id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-700">
+                      {nameInitials(summary.student?.name)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">{summary.student?.name ?? '-'}</p>
+                      <p className="truncate text-xs text-slate-400">
+                        {summary.student?.student_code ?? ''}
+                        {(summary.student as any)?.class_room?.name ? ` · ${(summary.student as any)?.class_room?.name}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    title="Detail"
+                    aria-label={`Detail ${summary.student?.name ?? 'siswa'}`}
+                    onClick={() => {
+                      setDetailId(summary.student_id);
+                      setDetailName(summary.student?.name ?? '');
+                      setDetailCode(summary.student?.student_code ?? '');
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <ProgressBar value={summary.progress_percentage} className="flex-1" />
+                  <span className="w-11 shrink-0 text-right text-xs font-semibold text-slate-700">{summary.progress_percentage}%</span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <p className="text-[10px] text-slate-500">Ayat</p>
+                    <p className="mt-0.5 text-sm font-bold text-slate-900">{summary.total_ayah_covered}</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <p className="text-[10px] text-slate-500">Surah</p>
+                    <p className="mt-0.5 text-sm font-bold text-slate-900">{summary.total_surah_completed}</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <p className="text-[10px] text-slate-500">Juz</p>
+                    <p className="mt-0.5 text-sm font-bold text-slate-900">{summary.student?.memorization_target ?? summary.total_juz_completed}</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <p className="text-[10px] text-slate-500">Rata-rata Nilai</p>
+                    <p className="mt-0.5 text-sm font-bold text-slate-900">{summary.average_score ?? 0}</p>
+                  </div>
+                </div>
+
+                <p className="mt-2.5 text-xs text-slate-400">
+                  Setoran terakhir: {summary.last_submission_at ? formatDate(summary.last_submission_at) : '-'}
+                </p>
+              </div>
+            ))}
+          </div>
+          </>
         )}
 
         {!isLoading && summaries.length > 0 && (
