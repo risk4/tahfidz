@@ -25,6 +25,7 @@ import {
   Lock,
   LogOut,
   Mail,
+  Mic,
   Palette,
   Pencil,
   Plug,
@@ -1782,6 +1783,65 @@ function NotificationsSection() {
 }
 
 /* ============================================================
+ * Pengecekan Bacaan
+ * ============================================================ */
+
+function RecitationSection() {
+  const { values, setValue, status } = useAutoSaveSection('recitation_check');
+  const rec = values as AppSettings['recitation_check'];
+
+  return (
+    <div className="space-y-5">
+      <SectionHeader title="Pengecekan Bacaan" subtitle="Pilih mode fitur pengecekan bacaan (Web Speech API)" right={<SaveIndicator status={status} />} />
+      <Card>
+        <div className="grid gap-3 p-5 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setValue('save_enabled', false)}
+            aria-pressed={!rec.save_enabled}
+            className={`rounded-2xl border p-5 text-left transition-colors ${
+              !rec.save_enabled
+                ? 'border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-500/30'
+                : 'border-slate-200 bg-white hover:border-slate-300'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-bold text-slate-900">Realtime</p>
+              {!rec.save_enabled && <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />}
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+              Hasil pengecekan hanya tampil di layar siswa saat itu juga dan tidak disimpan ke database.
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setValue('save_enabled', true)}
+            aria-pressed={Boolean(rec.save_enabled)}
+            className={`rounded-2xl border p-5 text-left transition-colors ${
+              rec.save_enabled
+                ? 'border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-500/30'
+                : 'border-slate-200 bg-white hover:border-slate-300'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-bold text-slate-900">Simpan ke Database</p>
+              {rec.save_enabled && <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />}
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+              Hasil disimpan ke riwayat siswa dan status per-ayat diperbarui otomatis (≥90% hafal, 70–89% sedang dihafal). Hasil
+              realtime tetap tampil di layar.
+            </p>
+          </button>
+        </div>
+        <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+          Mode ini berlaku untuk semua siswa dan disimpan otomatis.
+        </p>
+      </Card>
+    </div>
+  );
+}
+
+/* ============================================================
  * Backup Data
  * ============================================================ */
 
@@ -2448,6 +2508,7 @@ type SectionId =
   | 'methods'
   | 'targets'
   | 'notifications'
+  | 'recitation'
   | 'backup'
   | 'security'
   | 'integrations'
@@ -2463,6 +2524,7 @@ const sections: { id: SectionId; label: string; icon: LucideIcon }[] = [
   { id: 'methods', label: 'Metode Muraja\'ah', icon: ListChecks },
   { id: 'targets', label: 'Target Hafalan', icon: Target },
   { id: 'notifications', label: 'Notifikasi', icon: Bell },
+  { id: 'recitation', label: 'Pengecekan Bacaan', icon: Mic },
   { id: 'backup', label: 'Backup Data', icon: Database },
   { id: 'security', label: 'Keamanan', icon: ShieldCheck },
   { id: 'integrations', label: 'Integrasi', icon: Plug },
@@ -2497,6 +2559,8 @@ export default function Settings() {
         return <TargetsSection />;
       case 'notifications':
         return <NotificationsSection />;
+      case 'recitation':
+        return <RecitationSection />;
       case 'backup':
         return <BackupSection />;
       case 'security':

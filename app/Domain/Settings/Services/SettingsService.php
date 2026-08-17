@@ -25,6 +25,7 @@ class SettingsService
         'notifications' => ['setoran_enabled', 'murajaah_enabled', 'target_enabled', 'announcement_enabled', 'absensi_enabled', 'system_enabled', 'templates'],
         'targets' => ['daily_pages', 'weekly_pages', 'monthly_pages'],
         'murajaah_methods' => ['methods'],
+        'recitation_check' => ['save_enabled'],
         'security' => ['session_timeout_minutes', 'two_factor_auth', 'login_notification'],
         'backup' => ['schedule_time', 'retention_days', 'encryption_enabled'],
         'integrations' => [
@@ -87,6 +88,12 @@ class SettingsService
                     ['id' => 3, 'name' => "Muraja'ah Kelompok", 'description' => "Muraja'ah bersama dalam kelompok halaqah.", 'active' => true, 'sort' => 3],
                     ['id' => 4, 'name' => "Muraja'ah Terbimbing", 'description' => "Muraja'ah dengan bimbingan langsung pembimbing.", 'active' => true, 'sort' => 4],
                 ],
+            ],
+            // Pengecekan bacaan (Web Speech API). Hasil pengecekan saat ini
+            // bersifat realtime; flag ini adalah opsi agar nantinya hasil bisa
+            // disimpan ke riwayat siswa (fitur penyimpanan belum diimplementasikan).
+            'recitation_check' => [
+                'save_enabled' => false,
             ],
             'security' => ['session_timeout_minutes' => 30, 'two_factor_auth' => false, 'login_notification' => false],
             'backup' => [

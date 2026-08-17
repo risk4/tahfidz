@@ -8,6 +8,7 @@ import type {
   PaginatedResponse,
   ProgressStats,
   QuranStatistics,
+  RecitationCheckPayload,
   SessionInfo,
   TeacherDetail,
   TeacherPerformancePoint,
@@ -564,6 +565,24 @@ export const murajaahService = {
 
   async updateAyahStatus(id: number, data: { ayah_number: number; memorization_status: MemorizationStatus }) {
     const response = await api.patch(`/murajaahs/${id}/ayah-status`, data);
+    return response.data;
+  },
+};
+
+export const recitationService = {
+  /** Flag penyimpanan riwayat (Pengaturan → Pengecekan Bacaan). */
+  async config() {
+    const response = await api.get<{ save_enabled: boolean }>('/recitation-checks/config');
+    return response.data;
+  },
+
+  async list(params?: { page?: number; per_page?: number; student_id?: number }) {
+    const response = await api.get('/recitation-checks', { params });
+    return response.data;
+  },
+
+  async create(payload: RecitationCheckPayload) {
+    const response = await api.post('/recitation-checks', payload);
     return response.data;
   },
 };

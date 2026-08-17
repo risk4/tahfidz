@@ -14,6 +14,7 @@ import TahfidzGroups from '@/pages/TahfidzGroups';
 import Submissions from '@/pages/Submissions';
 import Murajaah from '@/pages/Murajaah';
 import Quran, { SurahDetail } from '@/pages/Quran';
+import RecitationCheck from '@/pages/RecitationCheck';
 import Progress from '@/pages/Progress';
 import Settings from '@/pages/Settings';
 import '../css/app.css';
@@ -204,6 +205,14 @@ function AppRoutes() {
             ) : (
               <Navigate to="/dashboard" replace />
             )}
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/pengecekan-bacaan"
+        element={
+          <PrivateRoute>
+            <RecitationCheck />
           </PrivateRoute>
         }
       />

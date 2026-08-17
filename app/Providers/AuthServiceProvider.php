@@ -11,8 +11,10 @@ use App\Domain\People\Models\Teacher;
 use App\Domain\People\Policies\StudentPolicy;
 use App\Domain\People\Policies\TeacherPolicy;
 use App\Domain\Tahfidz\Models\Murajaah;
+use App\Domain\Tahfidz\Models\RecitationCheck;
 use App\Domain\Tahfidz\Models\Submission;
 use App\Domain\Tahfidz\Policies\MurajaahPolicy;
+use App\Domain\Tahfidz\Policies\RecitationCheckPolicy;
 use App\Domain\Tahfidz\Policies\SubmissionPolicy;
 use App\Domain\TahfidzGroup\Models\TahfidzGroup;
 use App\Domain\TahfidzGroup\Policies\TahfidzGroupPolicy;
@@ -28,6 +30,7 @@ class AuthServiceProvider extends ServiceProvider
         TahfidzGroup::class => TahfidzGroupPolicy::class,
         Submission::class => SubmissionPolicy::class,
         Murajaah::class => MurajaahPolicy::class,
+        RecitationCheck::class => RecitationCheckPolicy::class,
     ];
 
     public function boot(): void

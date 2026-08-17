@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { authService } from '@/services/api';
-import { KeyRound, Lock, Loader2, ShieldCheck, ArrowRight } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, KeyRound, Loader2, Lock, ShieldCheck } from 'lucide-react';
 
 interface FieldErrors {
   current_password?: string;
@@ -17,7 +17,7 @@ export default function ChangePassword() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
-  const [showPasswords, setShowPasswords] = useState(false);
+  const [show, setShow] = useState({ current: false, password: false, confirmation: false });
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -113,7 +113,7 @@ export default function ChangePassword() {
                 <input
                   id="current_password"
                   name="current_password"
-                  type={showPasswords ? 'text' : 'password'}
+                  type={show.current ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
                   value={currentPassword}
@@ -121,6 +121,15 @@ export default function ChangePassword() {
                   placeholder="Masukkan password saat ini"
                   className="bg-transparent outline-none text-sm flex-1 placeholder:text-gray-400"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShow((s) => ({ ...s, current: !s.current }))}
+                  aria-label={show.current ? 'Sembunyikan password' : 'Tampilkan password'}
+                  title={show.current ? 'Sembunyikan password' : 'Tampilkan password'}
+                  className="shrink-0 text-gray-400 transition-colors hover:text-gray-600"
+                >
+                  {show.current ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                </button>
               </div>
               {fieldErrors.current_password && (
                 <p className="mt-1 text-xs text-red-600">{fieldErrors.current_password}</p>
@@ -137,7 +146,7 @@ export default function ChangePassword() {
                 <input
                   id="password"
                   name="password"
-                  type={showPasswords ? 'text' : 'password'}
+                  type={show.password ? 'text' : 'password'}
                   autoComplete="new-password"
                   required
                   minLength={8}
@@ -146,6 +155,15 @@ export default function ChangePassword() {
                   placeholder="Minimal 8 karakter"
                   className="bg-transparent outline-none text-sm flex-1 placeholder:text-gray-400"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShow((s) => ({ ...s, password: !s.password }))}
+                  aria-label={show.password ? 'Sembunyikan password' : 'Tampilkan password'}
+                  title={show.password ? 'Sembunyikan password' : 'Tampilkan password'}
+                  className="shrink-0 text-gray-400 transition-colors hover:text-gray-600"
+                >
+                  {show.password ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                </button>
               </div>
               {fieldErrors.password && <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>}
             </div>
@@ -160,7 +178,7 @@ export default function ChangePassword() {
                 <input
                   id="password_confirmation"
                   name="password_confirmation"
-                  type={showPasswords ? 'text' : 'password'}
+                  type={show.confirmation ? 'text' : 'password'}
                   autoComplete="new-password"
                   required
                   value={confirmation}
@@ -168,21 +186,20 @@ export default function ChangePassword() {
                   placeholder="Ulangi password baru"
                   className="bg-transparent outline-none text-sm flex-1 placeholder:text-gray-400"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShow((s) => ({ ...s, confirmation: !s.confirmation }))}
+                  aria-label={show.confirmation ? 'Sembunyikan password' : 'Tampilkan password'}
+                  title={show.confirmation ? 'Sembunyikan password' : 'Tampilkan password'}
+                  className="shrink-0 text-gray-400 transition-colors hover:text-gray-600"
+                >
+                  {show.confirmation ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                </button>
               </div>
               {fieldErrors.password_confirmation && (
                 <p className="mt-1 text-xs text-red-600">{fieldErrors.password_confirmation}</p>
               )}
             </div>
-
-            <label className="flex items-center gap-2 text-sm text-gray-600 select-none cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showPasswords}
-                onChange={(e) => setShowPasswords(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              Tampilkan password
-            </label>
 
             <button
               type="submit"

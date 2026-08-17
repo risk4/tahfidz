@@ -21,6 +21,10 @@ Backend aplikasi menggunakan Laravel, sedangkan frontend menggunakan React, Type
   - Tampilan ayat murajaah.
   - Audio ayat dan tombol Play Semua.
   - Status hafalan per ayat: belum dihafal, sedang dihafal, dan sudah hafal.
+- Pengecekan Bacaan:
+  - Siswa membacakan hafalan lewat mikrofon (Web Speech API, bahasa Arab).
+  - Hasil dibandingkan per kata dengan teks ayat; kata salah/tidak terbaca ditandai.
+  - Bersifat realtime. Opsi penyimpanan ke riwayat tersedia di Pengaturan (default nonaktif).
 - Progress Hafalan:
   - Ringkasan progress siswa.
   - Progress per surah.

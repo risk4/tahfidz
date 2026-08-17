@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Master\TahfidzGroupController;
 use App\Http\Controllers\Api\Quran\QuranController;
 use App\Http\Controllers\Api\Tahfidz\MurajaahController;
 use App\Http\Controllers\Api\Tahfidz\ProgressController;
+use App\Http\Controllers\Api\Tahfidz\RecitationCheckController;
 use App\Http\Controllers\Api\Tahfidz\SubmissionController;
 
 use App\Http\Controllers\Api\Master\TeacherController;
@@ -67,6 +68,11 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::apiResource('murajaah', MurajaahController::class)->parameters(['murajaah' => 'murajaah']);
     Route::get('/murajaahs/{murajaah}/ayah-statuses', [MurajaahController::class, 'ayahStatuses']);
     Route::patch('/murajaahs/{murajaah}/ayah-status', [MurajaahController::class, 'updateAyahStatus']);
+
+    // ===== RECITATION CHECK — pengecekan bacaan (Web Speech API) =====
+    Route::get('/recitation-checks/config', [RecitationCheckController::class, 'config']);
+    Route::get('/recitation-checks', [RecitationCheckController::class, 'index']);
+    Route::post('/recitation-checks', [RecitationCheckController::class, 'store']);
 
     // ===== PROGRESS (STEP 3) =====
     Route::get('/progress/stats', [ProgressController::class, 'stats']);

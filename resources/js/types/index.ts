@@ -198,6 +198,41 @@ export interface QuranStatistics {
 
 export type MemorizationStatus = 'not_memorized' | 'in_progress' | 'memorized';
 
+export interface RecitationWordResult {
+  ayah_number: number;
+  word: string;
+  status: 'correct' | 'incorrect' | 'missing';
+  spoken?: string | null;
+}
+
+export interface RecitationCheckPayload {
+  surah_id: number;
+  start_ayah: number;
+  end_ayah: number;
+  transcript?: string;
+  extra_count: number;
+  details: RecitationWordResult[];
+}
+
+export interface RecitationCheck {
+  id: number;
+  student_id: number;
+  surah_id: number;
+  start_ayah: number;
+  end_ayah: number;
+  score: number;
+  correct_count: number;
+  incorrect_count: number;
+  missing_count: number;
+  extra_count: number;
+  transcript?: string | null;
+  details: RecitationWordResult[];
+  ayah_statuses?: Record<number, string> | null;
+  checked_at: string;
+  student?: Student;
+  surah?: QuranSurah;
+}
+
 export interface AyahMemorizationStatus {
   ayah_number: number;
   memorization_status: MemorizationStatus;
@@ -344,6 +379,9 @@ export interface AppSettings {
   };
   murajaah_methods: {
     methods: MurajaahMethod[];
+  };
+  recitation_check: {
+    save_enabled: boolean;
   };
   security: {
     session_timeout_minutes: number;

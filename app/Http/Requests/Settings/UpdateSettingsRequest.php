@@ -64,6 +64,9 @@ class UpdateSettingsRequest extends FormRequest
                 'methods.*.active' => ['sometimes', 'boolean'],
                 'methods.*.sort' => ['sometimes', 'integer', 'min:0', 'max:999'],
             ],
+            'recitation_check' => [
+                'save_enabled' => ['sometimes', 'boolean'],
+            ],
             'security' => [
                 'session_timeout_minutes' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1440'],
                 'two_factor_auth' => ['sometimes', 'boolean'],
