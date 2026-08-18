@@ -12,6 +12,7 @@ use App\Http\Requests\Settings\UploadLogoRequest;
 use App\Services\Audit\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 /**
@@ -214,5 +215,45 @@ class SettingsController extends Controller
         $this->auditLog->record($request->user(), 'backup_now', 'settings', null, $request);
 
         return response()->json(['group' => 'backup', 'values' => $backup]);
+    }
+
+    /** GET /api/settings/backup/download — unduh file backup terbaru. */
+    public function downloadBackup(Request $request)
+    {
+        $this->authorize('update', AppSetting::class);
+
+        $filename = $this->settings->latestBackupFilename();
+
+        if (! $filename) {
+            return response()->json(['message' => 'Belum ada backup yang dapat diunduh.'], 404);
+        }
+
+        $this->auditLog->record($request->user(), 'download_backup', 'settings', null, $request);
+
+        return Storage::disk('local')->download($filename, basename($filename));
+    }
+
+    /** POST /api/settings/backup/restore — pulihkan pengaturan dari file backup. */
+    public function restoreBackup(Request $request)
+    {
+        $this->authorize('update', AppSetting::class);
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:json,txt', 'max:5120'],
+        ], [
+            'file.required' => 'Pilih file backup terlebih dahulu.',
+            'file.mimes' => 'File backup harus berformat JSON (.json).',
+            'file.max' => 'Ukuran file backup maksimal 5 MB.',
+        ]);
+
+        try {
+            $this->settings->restoreFromJson($request->file('file')->get());
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $this->auditLog->record($request->user(), 'restore_backup', 'settings', null, $request);
+
+        return response()->json(['message' => 'Pengaturan berhasil dipulihkan dari backup.']);
     }
 }

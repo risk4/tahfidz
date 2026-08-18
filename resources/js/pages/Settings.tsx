@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Cloud,
   Database,
+  Download,
   Eye,
   EyeOff,
   FileText,
@@ -117,6 +118,8 @@ function actionLabel(action: string): string {
     revoke_session: 'Mencabut sesi',
     logout_all_devices: 'Keluar dari semua perangkat',
     backup_now: 'Melakukan backup',
+    download_backup: 'Mengunduh backup',
+    restore_backup: 'Memulihkan backup',
     create: 'Menambahkan data',
     update: 'Memperbarui data',
     delete: 'Menghapus data',
@@ -2019,6 +2022,10 @@ function BackupSection() {
   const values = form ?? base;
   const [saving, setSaving] = useState(false);
   const [backing, setBacking] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<{ msg: string; tone: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
@@ -2054,6 +2061,33 @@ function BackupSection() {
       setToast({ msg: 'Gagal membuat backup.', tone: 'error' });
     } finally {
       setBacking(false);
+    }
+  };
+
+  const downloadBackup = async () => {
+    setDownloading(true);
+    try {
+      await settingsService.downloadBackup();
+      setToast({ msg: 'Backup berhasil diunduh.', tone: 'success' });
+    } catch {
+      setToast({ msg: 'Belum ada backup yang dapat diunduh. Buat backup terlebih dahulu.', tone: 'error' });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const restore = async () => {
+    if (!restoreFile) return;
+    setRestoring(true);
+    try {
+      await settingsService.restoreBackup(restoreFile);
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      setRestoreFile(null);
+      setToast({ msg: 'Pengaturan berhasil dipulihkan dari backup.', tone: 'success' });
+    } catch {
+      setToast({ msg: 'Gagal memulihkan backup. Pastikan file JSON valid.', tone: 'error' });
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -2139,6 +2173,25 @@ function BackupSection() {
               {backing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Backup Sekarang
             </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) setRestoreFile(file);
+                e.target.value = '';
+              }}
+            />
+            <Button variant="outline" onClick={downloadBackup} disabled={downloading}>
+              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Download Backup
+            </Button>
+            <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={restoring}>
+              {restoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              Restore Backup
+            </Button>
           </div>
           <p className="text-xs text-slate-400">
             Backup menyimpan snapshot konfigurasi aplikasi (JSON) ke storage lokal — data santri & setoran tidak ikut
@@ -2146,6 +2199,30 @@ function BackupSection() {
           </p>
         </CardContent>
       </Card>
+
+      {restoreFile && (
+        <Modal title="Pulihkan Backup" subtitle={restoreFile.name} onClose={() => setRestoreFile(null)}>
+          <div className="p-6">
+            <div className="flex items-start gap-3 rounded-xl bg-amber-50 p-4">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Pengaturan saat ini akan ditimpa</p>
+                <p className="mt-1 text-xs text-amber-700">
+                  Pengaturan (profil, aplikasi, notifikasi, keamanan, backup, dll.) akan diganti dengan isi file backup.
+                  Nilai rahasia (SMTP password, API key) yang termasking tidak akan ditimpa.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setRestoreFile(null)}>Batal</Button>
+              <Button disabled={restoring} onClick={restore}>
+                {restoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                Pulihkan Sekarang
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

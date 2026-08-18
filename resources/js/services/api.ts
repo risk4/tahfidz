@@ -674,6 +674,33 @@ export const settingsService = {
     return response.data;
   },
 
+  /** Unduh file backup konfigurasi terbaru sebagai JSON. */
+  async downloadBackup(): Promise<void> {
+    const token = localStorage.getItem('token');
+    const response = await fetch('/api/settings/backup/download', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Gagal mengunduh backup.');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup_pengaturan_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  async restoreBackup(file: File): Promise<{ message: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/settings/backup/restore', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
   async testEmail(to?: string): Promise<{ status: 'sent' | 'failed'; message: string }> {
     const response = await api.post('/settings/test-email', { to });
     return response.data;

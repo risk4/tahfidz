@@ -14,8 +14,6 @@ import {
   BookMarked,
   BookOpen,
   Mic,
-  PanelLeftClose,
-  PanelLeftOpen,
   Settings,
   ChevronDown,
   UserRound,
@@ -147,7 +145,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </span>
             )}
             <span className={`leading-tight truncate ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
-              <span className="block text-[15px] font-extrabold tracking-tight text-slate-900 truncate">{appName}</span>
+              <span className="block truncate bg-gradient-to-r from-[#075B30] via-[#0D753F] to-[#059669] bg-clip-text text-base font-extrabold tracking-tight text-transparent">
+                {appName}
+              </span>
             </span>
           </Link>
           <button className="lg:hidden rounded-lg p-2 hover:bg-slate-100" onClick={() => setSidebarOpen(false)}>
@@ -203,7 +203,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               aria-label={sidebarCollapsed ? 'Tampilkan sidebar' : 'Sembunyikan sidebar'}
               className="hidden lg:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors"
             >
-              {sidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+              <Menu className="w-5 h-5" />
             </button>
           </div>
           <div className="ml-auto" ref={profileRef}>

@@ -95,6 +95,8 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::delete('/settings/sessions/{tokenId}', [SettingsController::class, 'revokeSession']);
     Route::post('/settings/logout-all', [SettingsController::class, 'logoutAll']);
     Route::post('/settings/backup', [SettingsController::class, 'backupNow']);
+    Route::get('/settings/backup/download', [SettingsController::class, 'downloadBackup']);
+    Route::post('/settings/backup/restore', [SettingsController::class, 'restoreBackup']);
 
     // Endpoint quran/submissions/murajaah/progress/reports akan ditambahkan
     // di STEP 3 dan STEP 4/5 sesuai rencana bertahap — belum di file ini.

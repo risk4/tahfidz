@@ -237,6 +237,12 @@ class SettingsService
 
         Storage::disk('local')->put($filename, $json);
 
+        // Bersihkan file backup lama secara otomatis sesuai retention_days
+        // yang tersimpan (default 30 hari). File yang baru dibuat pasti lolos
+        // karena usianya 0 hari.
+        $retentionDays = (int) ($this->rawGroup('backup')['retention_days'] ?? 30);
+        $this->cleanupOldBackups($retentionDays);
+
         foreach ([
             'last_backup_at' => now()->toDateTimeString(),
             'last_backup_status' => 'success',
@@ -246,6 +252,77 @@ class SettingsService
         }
 
         return $this->group('backup');
+    }
+
+    /**
+     * Hapus file backup yang lebih lama dari batas retensi (hari). Nama file
+     * memuat timestamp (Ymd_His) sehingga usia file bisa dihitung tanpa metadata.
+     * Mengembalikan jumlah file yang dihapus.
+     */
+    private function cleanupOldBackups(int $retentionDays): int
+    {
+        $cutoff = now()->subDays(max(1, $retentionDays));
+        $deleted = 0;
+
+        foreach (Storage::disk('local')->files('backups') as $path) {
+            if (! preg_match('/^backups\/settings-(\d{8}_\d{6})\.json$/', $path, $matches)) {
+                continue;
+            }
+
+            $createdAt = \Carbon\Carbon::createFromFormat('Ymd_His', $matches[1]);
+            if ($createdAt && $createdAt->lt($cutoff) && Storage::disk('local')->delete($path)) {
+                $deleted++;
+            }
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * Nama file backup konfigurasi terbaru di disk lokal, atau null bila
+     * belum pernah ada backup. File diurutkan alfabetis karena nama file
+     * memakai timestamp (Ymd_His) sehingga yang terbaru selalu paling akhir.
+     */
+    public function latestBackupFilename(): ?string
+    {
+        $backups = array_values(array_filter(
+            Storage::disk('local')->files('backups'),
+            fn (string $path) => preg_match('/^backups\/settings-\d{8}_\d{6}\.json$/', $path) === 1
+        ));
+
+        if (empty($backups)) {
+            return null;
+        }
+
+        sort($backups);
+
+        return end($backups);
+    }
+
+    /**
+     * Pulihkan pengaturan dari file backup (JSON) yang diunggah.
+     *
+     * Aman: hanya kunci yang masuk whitelist yang ditulis, nilai rahasia
+     * yang termasking/tidak diisi tidak menimpa nilai lama (lihat update()).
+     */
+    public function restoreFromJson(string $json): array
+    {
+        $data = json_decode($json, true);
+
+        if (! is_array($data)) {
+            throw new \InvalidArgumentException('File backup tidak valid: bukan JSON yang benar.');
+        }
+
+        foreach (array_keys($this->defaults()) as $group) {
+            $values = $data[$group] ?? null;
+            if (! is_array($values)) {
+                continue;
+            }
+
+            $this->update($group, $values);
+        }
+
+        return $this->all();
     }
 
     private function maskSecrets(array $values): array

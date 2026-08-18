@@ -278,55 +278,6 @@ function CompareChart({ data, loading }: { data: DashboardOverview['chart']; loa
  * Widgets
  * ================================================================ */
 
-function TargetTodayCard({ target, loading }: { target: DashboardOverview['target']; loading?: boolean }) {
-  const pct = loading ? 0 : target.percentage;
-
-  return (
-    <Card>
-      <SectionTitle title="Target Hari Ini" subtitle="Santri yang mencapai target hafalan" />
-      {loading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-16 w-full" />
-        </div>
-      ) : (
-        <>
-          <div className="flex items-end justify-between">
-            <p className="text-3xl font-extrabold text-slate-900">
-              {target.reached}
-              <span className="text-base font-semibold text-slate-400"> / {target.total} santri</span>
-            </p>
-            <span className="text-2xl font-extrabold text-emerald-600">{pct}%</span>
-          </div>
-          <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${pct}%` }} />
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl bg-emerald-50 px-2 py-2.5">
-              <p className="text-lg font-extrabold text-emerald-700">{target.reached}</p>
-              <p className="text-[11px] text-emerald-600">Mencapai target</p>
-            </div>
-            <div className="rounded-xl bg-amber-50 px-2 py-2.5">
-              <p className="text-lg font-extrabold text-amber-700">{target.not_reached}</p>
-              <p className="text-[11px] text-amber-600">Belum mencapai</p>
-            </div>
-            <div className="rounded-xl bg-slate-50 px-2 py-2.5">
-              <p className="text-lg font-extrabold text-slate-700">{target.no_activity}</p>
-              <p className="text-[11px] text-slate-500">Tidak beraktivitas</p>
-            </div>
-          </div>
-          <Link
-            to="/progress"
-            className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
-          >
-            Lihat Detail <ArrowRight className="h-4 w-4" />
-          </Link>
-        </>
-      )}
-    </Card>
-  );
-}
-
 function RecentActivities({ items, loading }: { items: DashboardOverview['recent_activities']; loading?: boolean }) {
   return (
     <Card>
@@ -971,7 +922,7 @@ export default function Dashboard() {
       ) : (
         <>
           {/* KPI */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <KpiCard
               label="Total Santri"
               value={data?.statistics.total_students ?? '—'}
@@ -997,15 +948,6 @@ export default function Dashboard() {
               iconBg="bg-violet-50"
               iconColor="text-violet-600"
               trend={<Trend value={data?.statistics.murajaahs_trend ?? null} suffix="dari kemarin" />}
-              loading={isLoading}
-            />
-            <KpiCard
-              label="Target Tercapai"
-              value={`${data?.statistics.target_percentage ?? 0}%`}
-              icon={Target}
-              iconBg="bg-amber-50"
-              iconColor="text-amber-600"
-              secondary={isLoading ? undefined : `${data?.statistics.target_reached ?? 0} dari ${data?.statistics.target_base ?? 0} santri`}
               loading={isLoading}
             />
             <KpiCard
@@ -1070,16 +1012,6 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Target + aktivitas */}
-          <div className="grid gap-5 lg:grid-cols-5">
-            <div className="lg:col-span-2">
-              <TargetTodayCard target={data?.target ?? { total: 0, reached: 0, not_reached: 0, no_activity: 0, percentage: 0 }} loading={isLoading} />
-            </div>
-            <div className="lg:col-span-3">
-              <RecentActivities items={data?.recent_activities ?? []} loading={isLoading} />
-            </div>
-          </div>
-
           {/* Setoran terbaru */}
           <RecentSubmissions items={data?.recent_submissions ?? []} loading={isLoading} />
 
@@ -1097,6 +1029,9 @@ export default function Dashboard() {
 
           {/* Insight */}
           <Insights items={data?.insights ?? []} loading={isLoading} />
+
+          {/* Aktivitas terbaru */}
+          <RecentActivities items={data?.recent_activities ?? []} loading={isLoading} />
 
           {/* Loading footer indicator */}
           {isLoading && (
