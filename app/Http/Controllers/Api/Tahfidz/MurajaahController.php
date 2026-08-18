@@ -14,6 +14,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tahfidz\StoreMurajaahRequest;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MurajaahController extends Controller
 {
@@ -223,6 +228,223 @@ class MurajaahController extends Controller
             'ayah_number' => $data['ayah_number'],
             'memorization_status' => $stored,
         ]);
+    }
+
+    /**
+     * Export data muraja'ah (CSV/XLSX) — menerapkan filter yang sama dengan index().
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', Murajaah::class);
+
+        $query = Murajaah::query()
+            ->with(['student.classRoom', 'teacher', 'academicYear', 'surah']);
+
+        if ($request->user()->isTeacher()) {
+            $teacherId = $request->user()->teacher?->id;
+            $query->whereHas('student', function ($student) use ($teacherId) {
+                $student->where(function ($q) use ($teacherId) {
+                    $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
+                        ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
+                });
+            });
+        }
+
+        if ($studentId = $request->integer('student_id')) {
+            $query->where('student_id', $studentId);
+        }
+
+        if ($search = trim((string) $request->query('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('notes', 'like', "%{$search}%")
+                    ->orWhere('juz', $search)
+                    ->orWhereHas('student', fn ($sq) => $sq
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('student_code', 'like', "%{$search}%")
+                        ->orWhere('nis', 'like', "%{$search}%"))
+                    ->orWhereHas('surah', fn ($sq) => $sq
+                        ->where('name_latin', 'like', "%{$search}%")
+                        ->orWhere('translation', 'like', "%{$search}%"));
+            });
+        }
+
+        if ($surahId = $request->integer('surah_id')) {
+            $query->where('surah_id', $surahId);
+        }
+
+        if ($juz = $request->integer('juz')) {
+            $query->where('juz', $juz);
+        }
+
+        if ($method = $request->query('method', $request->query('metode'))) {
+            $query->where('method', $method);
+        }
+
+        if ($status = $request->query('status')) {
+            $query->where('status', match ($status) {
+                'LANCAR' => 'approved',
+                'PERLU_MUROJAAH' => 'revision',
+                default => $status,
+            });
+        }
+
+        $dateFrom = $request->query('date_from', $request->query('from'));
+        $dateTo = $request->query('date_to', $request->query('to'));
+
+        if ($dateFrom) {
+            $query->whereDate('date', '>=', $dateFrom);
+        }
+
+        if ($dateTo) {
+            $query->whereDate('date', '<=', $dateTo);
+        }
+
+        if ($academicYearId = $request->integer('academic_year_id')) {
+            $query->where('academic_year_id', $academicYearId);
+        }
+
+        $murajaahs = $query
+            ->orderByDesc('date')
+            ->orderByDesc('time')
+            ->get();
+
+        QuranSurah::attachJuzRanges($murajaahs->pluck('surah'));
+
+        $methodLabel = [
+            'independent' => "Muraja'ah Mandiri",
+            'repeated' => "Muraja'ah Berulang",
+            'group' => "Muraja'ah Kelompok",
+            'guided' => "Muraja'ah Terbimbing",
+        ];
+
+        $headers = [
+            'Tanggal', 'Waktu', 'Nama Santri', 'NIS', 'Kelas', 'Surah', 'Juz', 'Ayat Mulai', 'Ayat Akhir',
+            'Jumlah Halaman', 'Metode', 'Pembimbing', 'Durasi (menit)', 'Nilai Fasih', 'Nilai Tajwid',
+            'Nilai Makhraj', 'Nilai Fashahah', 'Status', 'Catatan', 'Tahun Ajaran',
+        ];
+
+        $rows = $murajaahs->map(fn (Murajaah $m) => [
+            $m->date?->format('Y-m-d') ?? '',
+            $m->time ?? '',
+            $m->student?->name ?? '',
+            $m->student?->nis ?? $m->student?->student_code ?? '',
+            $m->student?->classRoom?->name ?? '',
+            $m->surah?->name_latin ?? '',
+            $this->juzRangeLabel($m->surah),
+            $m->start_ayah,
+            $m->end_ayah,
+            $m->page_count,
+            $methodLabel[$m->method] ?? $m->method ?? '',
+            $m->teacher?->name ?? '',
+            $m->duration_minutes ?? '',
+            $m->fluency_score ?? '',
+            $m->tajwid_score ?? '',
+            $m->makhraj_score ?? '',
+            $m->fashahah_score ?? '',
+            $this->statusLabel($m->status),
+            $m->notes ?? '',
+            $m->academicYear?->name ?? '',
+        ])->all();
+
+        $format = $this->resolveExportFormat($request->query('format'));
+        $filename = 'export_murajaah_' . now()->format('Ymd_His') . ($format === 'xlsx' ? '.xlsx' : '.csv');
+
+        return $format === 'xlsx'
+            ? $this->xlsxDownload($filename, $headers, $rows)
+            : $this->csvDownload($filename, $headers, $rows);
+    }
+
+    private function juzRangeLabel(mixed $surah): string
+    {
+        if (! $surah || empty($surah->juz_range)) {
+            return '';
+        }
+
+        $min = $surah->juz_range['min'];
+        $max = $surah->juz_range['max'];
+
+        return $min === $max ? "Juz {$min}" : "Juz {$min}-{$max}";
+    }
+
+    private function statusLabel(?string $status): string
+    {
+        return match ($status) {
+            'approved', 'LANCAR' => 'Disetujui',
+            'pending' => 'Menunggu',
+            'revision', 'PERLU_MUROJAAH' => 'Direvisi',
+            'rejected' => 'Ditolak',
+            default => $status ?? '',
+        };
+    }
+
+    private function resolveExportFormat(mixed $format): string
+    {
+        $format = strtolower(trim((string) $format));
+
+        return in_array($format, ['csv', 'xlsx'], true) ? $format : 'csv';
+    }
+
+    /**
+     * Guard CSV injection: sel berawalan =, +, -, @ (atau tab/CR) diberi prefiks
+     * apostrof agar tidak dieksekusi sebagai formula oleh Excel/Sheets.
+     */
+    private function sanitizeCsvCell(mixed $value): string
+    {
+        $value = (string) ($value ?? '');
+
+        if ($value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            return "'" . $value;
+        }
+
+        return $value;
+    }
+
+    private function csvDownload(string $filename, array $headers, array $rows): StreamedResponse
+    {
+        $stream = fopen('php://temp', 'r+');
+
+        fputcsv($stream, $headers);
+
+        foreach ($rows as $row) {
+            fputcsv($stream, array_map(fn ($value) => $this->sanitizeCsvCell($value), $row));
+        }
+
+        rewind($stream);
+
+        return response()->streamDownload(function () use ($stream) {
+            fpassthru($stream);
+            fclose($stream);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    private function xlsxDownload(string $filename, array $headers, array $rows): BinaryFileResponse
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->fromArray($headers, null, 'A1');
+        $sheet->getStyle('A1:' . $sheet->getHighestDataColumn() . '1')->getFont()->setBold(true);
+
+        if ($rows !== []) {
+            $sheet->fromArray($rows, null, 'A2');
+        }
+
+        foreach ($sheet->getRowIterator() as $row) {
+            $cellIterator = $row->getCellIterator();
+            $cellIterator->setIterateOnlyExistingCells(true);
+            foreach ($cellIterator as $cell) {
+                $value = $cell->getValue();
+                $cell->setValueExplicit(is_scalar($value) ? (string) $value : '', DataType::TYPE_STRING);
+            }
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $path = tempnam(sys_get_temp_dir(), 'tahfidz_export_');
+        $writer->save($path);
+
+        return response()->download($path, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
     }
 
     private function resolveTeacherId(Request $request): int

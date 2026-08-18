@@ -70,6 +70,8 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::get('/quran/surahs/{surah}/ayahs', [QuranController::class, 'ayahs']);
 
     // ===== SUBMISSION & MURAJAAH (STEP 3) =====
+    Route::get('/submissions/export', [SubmissionController::class, 'export']);
+    Route::get('/murajaahs/export', [MurajaahController::class, 'export']);
     Route::apiResource('submissions', SubmissionController::class);
     Route::apiResource('murajaahs', MurajaahController::class);
     Route::apiResource('murajaah', MurajaahController::class)->parameters(['murajaah' => 'murajaah']);

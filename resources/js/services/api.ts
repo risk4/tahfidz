@@ -509,6 +509,42 @@ export const submissionService = {
     const response = await api.get(`/submissions/${id}`);
     return response.data;
   },
+
+  async export(params?: {
+    search?: string;
+    student_id?: number;
+    surah_id?: number;
+    juz?: number;
+    type?: 'new_memorization' | 'repetition';
+    status?: string;
+    academic_year_id?: number;
+    from?: string;
+    to?: string;
+    date_from?: string;
+    date_to?: string;
+    format?: 'csv' | 'xlsx';
+  }) {
+    const token = localStorage.getItem('token');
+    const format = params?.format ?? 'csv';
+    const query = params
+      ? '?' + new URLSearchParams(
+          Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
+        ).toString()
+      : '';
+    const response = await fetch(`/api/submissions/export${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Gagal mengunduh data export.');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `export_setoran_${new Date().toISOString().slice(0, 10)}.${format === 'xlsx' ? 'xlsx' : 'csv'}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
 };
 
 export const murajaahService = {
@@ -577,6 +613,43 @@ export const murajaahService = {
   async updateAyahStatus(id: number, data: { ayah_number: number; memorization_status: MemorizationStatus }) {
     const response = await api.patch(`/murajaahs/${id}/ayah-status`, data);
     return response.data;
+  },
+
+  async export(params?: {
+    search?: string;
+    student_id?: number;
+    surah_id?: number;
+    juz?: number;
+    method?: string;
+    metode?: string;
+    status?: string;
+    academic_year_id?: number;
+    date_from?: string;
+    date_to?: string;
+    from?: string;
+    to?: string;
+    format?: 'csv' | 'xlsx';
+  }) {
+    const token = localStorage.getItem('token');
+    const format = params?.format ?? 'csv';
+    const query = params
+      ? '?' + new URLSearchParams(
+          Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
+        ).toString()
+      : '';
+    const response = await fetch(`/api/murajaahs/export${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Gagal mengunduh data export.');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `export_murajaah_${new Date().toISOString().slice(0, 10)}.${format === 'xlsx' ? 'xlsx' : 'csv'}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   },
 };
 
