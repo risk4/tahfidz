@@ -39,6 +39,16 @@ export const authService = {
     const response = await api.post('/auth/change-password', { current_password, password, password_confirmation });
     return response.data;
   },
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const response = await api.post<{ message: string }>('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  async resetPassword(data: { email: string; token: string; password: string; password_confirmation: string }): Promise<{ message: string }> {
+    const response = await api.post<{ message: string }>('/auth/reset-password', data);
+    return response.data;
+  },
 };
 
 export const academicYearService = {

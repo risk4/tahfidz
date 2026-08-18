@@ -7,9 +7,10 @@ interface PasswordInputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
   describedBy?: string;
   className?: string;
+  hideForgotLink?: boolean;
 }
 
-export function PasswordInput({ id, label, invalid, describedBy, className, ...props }: PasswordInputProps) {
+export function PasswordInput({ id, label, invalid, describedBy, className, hideForgotLink, ...props }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -18,12 +19,14 @@ export function PasswordInput({ id, label, invalid, describedBy, className, ...p
         <label htmlFor={id} className="text-[13px] font-medium text-[#172033]">
           {label}
         </label>
+        {!hideForgotLink && (
         <a
           href="/forgot-password"
           className="text-xs font-medium text-[#0D753F] transition-colors duration-150 hover:text-[#075B30]"
         >
           Lupa kata sandi?
         </a>
+        )}
       </div>
       <div className="relative">
         <Lock size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" aria-hidden="true" />

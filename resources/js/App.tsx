@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import AppLayout from '@/layouts/AppLayout';
 import Landing from '@/pages/Landing';
 import Login from '@/pages/Login';
+import ForgotPassword from '@/pages/ForgotPassword';
+import ResetPassword from '@/pages/ResetPassword';
 import ChangePassword from '@/pages/ChangePassword';
 import Dashboard from '@/pages/Dashboard';
 import AcademicYears from '@/pages/AcademicYears';
@@ -88,6 +90,22 @@ function AppRoutes() {
         element={
           <PublicRoute>
             <Login />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPassword />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <PublicRoute>
+            <ResetPassword />
           </PublicRoute>
         }
       />

@@ -21,6 +21,12 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1'); // rate limit login: 10x/menit
 
+// Lupa kata sandi (tanpa autentikasi — pengguna belum bisa masuk)
+Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])
+    ->middleware('throttle:5,1'); // max 5 permintaan/menit
+Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
+    ->middleware('throttle:5,1'); // max 5 permintaan/menit
+
 Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
