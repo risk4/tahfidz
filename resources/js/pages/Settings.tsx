@@ -120,6 +120,7 @@ function actionLabel(action: string): string {
     backup_now: 'Melakukan backup',
     download_backup: 'Mengunduh backup',
     restore_backup: 'Memulihkan backup',
+    clear_activity_logs: 'Menghapus log aktivitas',
     create: 'Menambahkan data',
     update: 'Memperbarui data',
     delete: 'Menghapus data',
@@ -2676,6 +2677,8 @@ function IntegrationsSection() {
 
 function LogsSection() {
   const [page, setPage] = useState(1);
+  const queryClient = useQueryClient();
+  const [toast, setToast] = useState<{ msg: string; tone: 'success' | 'error' } | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ['settings-activity-logs', page],
     queryFn: () => settingsService.activityLogs({ page, per_page: 15 }),
@@ -2685,9 +2688,42 @@ function LogsSection() {
   const total = data?.total ?? 0;
   const lastPage = data?.last_page ?? 1;
 
+  const clearLogs = useMutation({
+    mutationFn: () => settingsService.clearActivityLogs(),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['settings-activity-logs'] });
+      setPage(1);
+      setToast({ msg: res.message, tone: 'success' });
+    },
+    onError: () => setToast({ msg: 'Gagal menghapus log aktivitas.', tone: 'error' }),
+  });
+
+  const handleClear = () => {
+    if (window.confirm('Hapus seluruh log aktivitas? Data yang dihapus tidak dapat dikembalikan.')) {
+      clearLogs.mutate();
+    }
+  };
+
   return (
     <div className="space-y-5">
-      <SectionHeader title="Log Aktivitas" subtitle="Riwayat aktivitas pengguna" />
+      <SectionHeader
+        title="Log Aktivitas"
+        subtitle="Riwayat aktivitas pengguna"
+        right={
+          logs.length > 0 ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+              disabled={clearLogs.isPending}
+              onClick={handleClear}
+            >
+              {clearLogs.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
+              {clearLogs.isPending ? 'Menghapus...' : 'Hapus Log'}
+            </Button>
+          ) : undefined
+        }
+      />
       <Card className="overflow-hidden">
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[680px]">
@@ -2763,6 +2799,7 @@ function LogsSection() {
         </div>
         <Pagination page={page} lastPage={lastPage} onChange={setPage} total={total} />
       </Card>
+      {toast && <Toast msg={toast.msg} tone={toast.tone} onClose={() => setToast(null)} />}
     </div>
   );
 }

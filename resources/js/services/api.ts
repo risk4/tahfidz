@@ -682,6 +682,11 @@ export const settingsService = {
     return response.data;
   },
 
+  async clearActivityLogs(): Promise<{ message: string }> {
+    const response = await api.delete('/settings/activity-logs');
+    return response.data;
+  },
+
   async sessions(): Promise<SessionInfo[]> {
     const response = await api.get<SessionInfo[]>('/settings/sessions');
     return response.data;

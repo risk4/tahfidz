@@ -135,6 +135,18 @@ class SettingsController extends Controller
             ->paginate($perPage);
     }
 
+    /** DELETE /api/settings/activity-logs — hapus seluruh log aktivitas. */
+    public function clearActivityLogs(Request $request)
+    {
+        $this->authorize('update', AppSetting::class);
+
+        DB::table('audit_logs')->delete();
+
+        $this->auditLog->record($request->user(), 'clear_activity_logs', 'activity_log', null, $request);
+
+        return response()->json(['message' => 'Semua log aktivitas berhasil dihapus.']);
+    }
+
     /** GET /api/settings/sessions — sesi (token Sanctum) akun saat ini. */
     public function sessions(Request $request)
     {

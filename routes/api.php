@@ -103,6 +103,7 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::get('/settings/users', [SettingsController::class, 'users']);
     Route::post('/settings/users/{user}/toggle-active', [SettingsController::class, 'toggleUserActive']);
     Route::get('/settings/activity-logs', [SettingsController::class, 'activityLogs']);
+    Route::delete('/settings/activity-logs', [SettingsController::class, 'clearActivityLogs']);
     Route::get('/settings/sessions', [SettingsController::class, 'sessions']);
     Route::delete('/settings/sessions/{tokenId}', [SettingsController::class, 'revokeSession']);
     Route::post('/settings/logout-all', [SettingsController::class, 'logoutAll']);
