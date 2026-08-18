@@ -35,7 +35,9 @@ return new class extends Migration
             }
         });
 
-        DB::statement("ALTER TABLE murajaahs MODIFY status VARCHAR(32) NOT NULL DEFAULT 'pending'");
+        if (Schema::getConnection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE murajaahs MODIFY status VARCHAR(32) NOT NULL DEFAULT 'pending'");
+        }
         DB::table('murajaahs')->where('status', 'LANCAR')->update(['status' => 'approved']);
         DB::table('murajaahs')->where('status', 'PERLU_MUROJAAH')->update(['status' => 'revision']);
     }
@@ -44,7 +46,9 @@ return new class extends Migration
     {
         DB::table('murajaahs')->where('status', 'approved')->update(['status' => 'LANCAR']);
         DB::table('murajaahs')->whereIn('status', ['pending', 'revision', 'rejected'])->update(['status' => 'PERLU_MUROJAAH']);
-        DB::statement("ALTER TABLE murajaahs MODIFY status ENUM('LANCAR', 'PERLU_MUROJAAH') NOT NULL");
+        if (Schema::getConnection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE murajaahs MODIFY status ENUM('LANCAR', 'PERLU_MUROJAAH') NOT NULL");
+        }
 
         Schema::table('murajaahs', function (Blueprint $table) {
             foreach (['time', 'juz', 'page_count', 'method', 'duration_minutes', 'audio_path'] as $column) {

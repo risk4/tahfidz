@@ -77,7 +77,8 @@ class BackupTest extends TestCase
         ]);
 
         $response->assertOk();
-        $this->assertDatabaseHas('settings', ['key' => 'profile.name', 'value' => 'Madrasah Pulih']);
-        $this->assertDatabaseHas('settings', ['key' => 'application.app_name', 'value' => 'Aplikasi Pulih']);
+        // Nilai tersimpan sebagai JSON (cast array) — bandingkan lewat model.
+        $this->assertSame('Madrasah Pulih', AppSetting::where('key', 'profile.name')->value('value'));
+        $this->assertSame('Aplikasi Pulih', AppSetting::where('key', 'application.app_name')->value('value'));
     }
 }

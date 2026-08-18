@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\Tahfidz\RecitationCheckController;
 use App\Http\Controllers\Api\Tahfidz\SubmissionController;
 
 use App\Http\Controllers\Api\Master\TeacherController;
+use App\Http\Controllers\Api\Notifications\NotificationController;
 use App\Http\Controllers\Api\Settings\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -81,6 +82,11 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
 
     // ===== DASHBOARD =====
     Route::get('/dashboard/overview', [DashboardController::class, 'overview']);
+
+    // ===== NOTIFICATIONS (pusat notifikasi in-app) =====
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/read', [NotificationController::class, 'markAllRead']);
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
 
     // ===== SETTINGS (halaman Pengaturan — khusus super admin via policy) =====
     Route::get('/settings', [SettingsController::class, 'index']);

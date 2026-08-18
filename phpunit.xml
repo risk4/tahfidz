@@ -23,12 +23,17 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <!-- force=true: PHPUnit 12 tidak meng-override env yang sudah ada di shell
-             (mis. DB_CONNECTION=mysql) tanpa flag ini — tanpanya test bisa
-             menjalankan migrate:fresh ke database asli. -->
+        <!-- Sangat penting: env shell bisa berisi DB_CONNECTION=mysql. PHPUnit
+             &lt;env force&gt; hanya mengubah putenv/$_ENV sedangkan Laravel membaca
+             $_SERVER lebih dulu — jadi DB_* juga diset sebagai &lt;server&gt;
+             (PHPUnit menimpanya tanpa syarat) agar test SELALU memakai sqlite
+             in-memory dan tidak pernah migrate:fresh ke database asli. -->
         <env name="DB_CONNECTION" value="sqlite" force="true"/>
         <env name="DB_DATABASE" value=":memory:" force="true"/>
         <env name="DB_URL" value="" force="true"/>
+        <server name="DB_CONNECTION" value="sqlite" force="true"/>
+        <server name="DB_DATABASE" value=":memory:" force="true"/>
+        <server name="DB_URL" value="" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

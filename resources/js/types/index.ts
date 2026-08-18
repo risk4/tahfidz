@@ -447,6 +447,29 @@ export interface SessionInfo {
   current: boolean;
 }
 
+export interface NotificationItem {
+  id: number;
+  type: string;
+  subject: string | null;
+  body: string | null;
+  status: 'sent' | 'skipped' | 'failed';
+  error: string | null;
+  student_id: number | null;
+  student_name: string | null;
+  recipient_email: string | null;
+  sent_at: string | null;
+  created_at: string | null;
+  is_read: boolean;
+}
+
+export interface NotificationListResponse {
+  data: NotificationItem[];
+  unread_count: number;
+  total: number;
+  last_page: number;
+  current_page: number;
+}
+
 export interface DashboardStatistics {
   total_students: number;
   active_students: number;

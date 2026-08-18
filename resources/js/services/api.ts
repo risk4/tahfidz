@@ -5,6 +5,7 @@ import type {
   DashboardOverview,
   DashboardRange,
   MemorizationStatus,
+  NotificationListResponse,
   PaginatedResponse,
   ProgressStats,
   QuranStatistics,
@@ -608,6 +609,23 @@ export const dashboardService = {
   async overview(range: DashboardRange = '30d') {
     const response = await api.get('/dashboard/overview', { params: { range } });
     return response.data as DashboardOverview;
+  },
+};
+
+export const notificationService = {
+  async list(params?: { per_page?: number }): Promise<NotificationListResponse> {
+    const response = await api.get<NotificationListResponse>('/notifications', { params });
+    return response.data;
+  },
+
+  async markRead(id: number): Promise<{ message: string }> {
+    const response = await api.post(`/notifications/${id}/read`);
+    return response.data;
+  },
+
+  async markAllRead(): Promise<{ message: string }> {
+    const response = await api.post('/notifications/read');
+    return response.data;
   },
 };
 

@@ -13,7 +13,14 @@ return new class extends Migration
             $table->string('memorization_status', 20)->default('memorized')->after('ayah_number');
         });
 
+        // first_covered_submission_id harus nullable di semua driver —
+        // pengecekan bacaan (recitation check) membuat coverage tanpa
+        // mengacu ke submission.
         if (Schema::getConnection()->getDriverName() === 'sqlite') {
+            Schema::table('student_ayah_coverage', function (Blueprint $table) {
+                $table->foreignId('first_covered_submission_id')->nullable()->change();
+            });
+
             return;
         }
 

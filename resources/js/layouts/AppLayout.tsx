@@ -17,11 +17,35 @@ import {
   Settings,
   ChevronDown,
   UserRound,
+  Bell,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { settingsService } from '@/services/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { notificationService, settingsService } from '@/services/api';
 import type { AppSettings } from '@/types';
+
+const NOTIF_TYPE_LABEL: Record<string, string> = {
+  setoran: 'Setoran Hafalan',
+  murajaah: "Muraja'ah",
+  target: 'Target Tercapai',
+  announcement: 'Pengumuman',
+  absensi: 'Absensi',
+  system: 'Sistem',
+  test: 'Email Uji',
+};
+
+const NOTIF_STATUS_META: Record<string, { label: string; cls: string }> = {
+  sent: { label: 'Terkirim', cls: 'bg-emerald-100 text-emerald-700' },
+  skipped: { label: 'Dilewati', cls: 'bg-amber-100 text-amber-700' },
+  failed: { label: 'Gagal', cls: 'bg-rose-100 text-rose-700' },
+};
+
+function notifTime(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -65,11 +89,33 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
+  const { data: notifData } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => notificationService.list({ per_page: 8 }),
+    refetchInterval: 60_000,
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: () => notificationService.markAllRead(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+
+  const markReadMutation = useMutation({
+    mutationFn: (id: number) => notificationService.markRead(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setProfileOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
       }
     };
     document.addEventListener('mousedown', onClick);
@@ -206,9 +252,91 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <Menu className="w-5 h-5" />
             </button>
           </div>
-          <div className="ml-auto" ref={profileRef}>
-            <button
-              onClick={() => setProfileOpen((v) => !v)}
+          <div className="ml-auto flex items-center gap-2">
+            {/* Pusat notifikasi in-app */}
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setNotifOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={notifOpen}
+                title="Notifikasi"
+                className="relative rounded-xl border border-slate-200 bg-white p-2 shadow-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+              >
+                <Bell className="h-5 w-5" />
+                {(notifData?.unread_count ?? 0) > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                    {(notifData?.unread_count ?? 0) > 99 ? '99+' : notifData?.unread_count}
+                  </span>
+                )}
+              </button>
+
+              {notifOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 z-40 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl"
+                >
+                  <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">Notifikasi</p>
+                      <p className="text-xs text-slate-400">{notifData?.unread_count ?? 0} belum dibaca</p>
+                    </div>
+                    {(notifData?.unread_count ?? 0) > 0 && (
+                      <button
+                        onClick={() => markAllReadMutation.mutate()}
+                        disabled={markAllReadMutation.isPending}
+                        className="text-xs font-semibold text-emerald-600 transition-colors hover:text-emerald-700 disabled:opacity-50"
+                      >
+                        Tandai semua dibaca
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-[22rem] overflow-y-auto">
+                    {!notifData || notifData.data.length === 0 ? (
+                      <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
+                        <Bell className="h-8 w-8 text-slate-200" />
+                        <p className="text-sm font-semibold text-slate-700">Belum ada notifikasi</p>
+                        <p className="text-xs text-slate-400">Notifikasi setoran, murajaah, dan target akan muncul di sini.</p>
+                      </div>
+                    ) : (
+                      notifData.data.map((n) => {
+                        const meta = NOTIF_STATUS_META[n.status] ?? { label: n.status, cls: 'bg-slate-100 text-slate-600' };
+                        return (
+                          <button
+                            key={n.id}
+                            onClick={() => {
+                              if (!n.is_read) markReadMutation.mutate(n.id);
+                              setNotifOpen(false);
+                            }}
+                            className={`flex w-full items-start gap-3 border-b border-slate-50 px-4 py-3 text-left transition-colors last:border-0 hover:bg-slate-50 ${
+                              n.is_read ? '' : 'bg-emerald-50/40'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-slate-900">{NOTIF_TYPE_LABEL[n.type] ?? n.type}</span>
+                                {!n.is_read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />}
+                              </div>
+                              <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{n.subject || n.body || '-'}</p>
+                              <p className="mt-1 truncate text-[11px] text-slate-400">
+                                {n.student_name ? `${n.student_name} · ` : ''}
+                                {notifTime(n.created_at)}
+                                {n.status === 'skipped' && n.error ? ` · ${n.error}` : ''}
+                              </p>
+                            </div>
+                            <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${meta.cls}`}>{meta.label}</span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="relative" ref={profileRef}>
+              <button
+                onClick={() => setProfileOpen((v) => !v)}
               aria-haspopup="menu"
               aria-expanded={profileOpen}
               className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white py-1.5 pl-1.5 pr-2.5 shadow-sm transition-colors hover:bg-slate-50"
@@ -242,6 +370,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </div>
               </div>
             )}
+            </div>
           </div>
         </header>
 
