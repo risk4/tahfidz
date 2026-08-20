@@ -63,7 +63,7 @@ Pastikan perangkat sudah memiliki:
 - Database SQLite, MySQL, atau MariaDB
 - Git
 
-Untuk lingkungan lokal Windows, aplikasi ini dapat dijalankan menggunakan Laragon, XAMPP, atau `php artisan serve`.
+Untuk lingkungan lokal Windows, aplikasi ini dapat dijalankan menggunakan Laragon, XAMPP, atau `php artisan serve`. Untuk instalasi di VPS Linux (Ubuntu/Debian), lihat bagian **Instalasi di VPS** di bawah.
 
 ## Instalasi Lokal
 
@@ -176,6 +176,261 @@ Jika menggunakan Laragon/Apache/Nginx, pastikan document root mengarah ke folder
 ```txt
 public
 ```
+
+## Instalasi di VPS
+
+Panduan berikut menargetkan VPS Linux (Ubuntu/Debian) dengan **Nginx + PHP-FPM** dan **MySQL/MariaDB**. Langkah ini mengasumsikan Anda sudah masuk sebagai user dengan hak `sudo` dan sudah punya domain yang mengarah ke IP VPS.
+
+### 1. Install dependency sistem
+
+```bash
+sudo apt update
+sudo apt install -y nginx mysql-server software-properties-common \
+    git unzip curl
+
+# Tambahkan repositori php sury.org (Ubuntu) agar mendapat PHP 8.3+
+sudo add-apt-repository ppa:ondrej/php -y
+sudo apt update
+
+# Install PHP 8.3 dan ekstensi yang dibutuhkan Laravel
+sudo apt install -y php8.3-fpm php8.3-cli php8.3-mbstring php8.3-xml \
+    php8.3-curl php8.3-zip php8.3-mysql php8.3-gd php8.3-intl \
+    php8.3-bcmath php8.3-sqlite3 php8.3-bz2
+```
+
+Catatan: jika hanya memakai SQLite, ekstensi `php8.3-mysql` bisa diganti `php8.3-sqlite3` dan abaikan langkah MySQL di bawah.
+
+### 2. Install Composer dan Node.js
+
+```bash
+# Composer
+curl -sS https://getcomposer.org/installer | php
+sudo mv composer.phar /usr/local/bin/composer
+
+# Node.js 20+ (gunakan versi LTS terbaru)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+```
+
+Verifikasi instalasi:
+
+```bash
+composer --version
+node -v
+npm -v
+```
+
+### 3. Siapkan database MySQL
+
+```bash
+sudo mysql
+```
+
+Di prompt MySQL, buat database dan user khusus (ganti nilai sesuai kebutuhan):
+
+```sql
+CREATE DATABASE tahfidz_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'tahfidz'@'localhost' IDENTIFIED BY 'GANTI_DENGAN_PASSWORD_KUAT';
+GRANT ALL PRIVILEGES ON tahfidz_app.* TO 'tahfidz'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+### 4. Clone repository dan install dependency
+
+```bash
+cd /var/www
+sudo git clone https://github.com/risk4/tahfidz.git
+cd tahfidz
+
+sudo chown -R $USER:www-data .
+sudo chmod -R 775 storage bootstrap/cache
+
+composer install --no-dev --optimize-autoloader
+npm install
+npm run build
+```
+
+### 5. Konfigurasi environment
+
+```bash
+cp .env.example .env
+php artisan key:generate
+```
+
+Edit `.env`:
+
+```bash
+nano .env
+```
+
+Ubah setidaknya menjadi:
+
+```env
+APP_NAME="Tahfidz App"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://domain-anda.com
+
+# Opsional: tetap gunakan password seeder yang sama
+# SEED_USER_PASSWORD=GANTI_PRINT_KE_KONSOLE_ATAU_KOSONGKAN
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=tahfidz_app
+DB_USERNAME=tahfidz
+DB_PASSWORD=GANTI_DENGAN_PASSWORD_KUAT
+```
+
+> **Tips password seeder:** jika `SEED_USER_PASSWORD` dibiarkan kosong, setiap akun seeder akan diberi password acak dan dicetak ke console saat seeding. Jika diisi, password tersebut yang dipakai untuk ketiga akun seeder — sebaiknya diubah setelah login pertama.
+
+### 6. Jalankan migration dan seeder
+
+```bash
+php artisan migrate --seed --force
+```
+
+### 7. Set permission storage dan symlink
+
+```bash
+sudo chown -R www-data:www-data storage bootstrap/cache
+
+# Buat symlink agar file upload (mis. logo) bisa diakses publik
+php artisan storage:link
+```
+
+### 8. Konfigurasi Nginx
+
+Buat file konfigurasi site:
+
+```bash
+sudo nano /etc/nginx/sites-available/tahfidz
+```
+
+Isi dengan (ganti `domain-anda.com` dan path sesuai lokasi repo):
+
+```nginx
+server {
+    listen 80;
+    server_name domain-anda.com;
+    root /var/www/tahfidz/public;
+
+    index index.php index.html;
+
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # Aset statis di-cache lama; file dari symlink storage juga dilayani
+    location ~* \.(css|js|jpg|jpeg|png|gif|webp|svg|ico|woff2?)$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+
+    client_max_body_size 20M;
+}
+```
+
+Aktifkan site dan reload Nginx:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/tahfidz /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### 9. Setup queue worker (Supervisor)
+
+Aplikasi memakai driver queue `database` (migration `jobs`). Jalankan worker agar proses async (notifikasi, dll.) berjalan. Install Supervisor:
+
+```bash
+sudo apt install -y supervisor
+```
+
+Buat file konfigurasi:
+
+```bash
+sudo nano /etc/supervisor/conf.d/tahfidz-worker.conf
+```
+
+Isi dengan (sesuaikan path):
+
+```ini
+[program:tahfidz-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/tahfidz/artisan queue:work --sleep=3 --tries=3
+directory=/var/www/tahfidz
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/www/tahfidz/storage/logs/worker.log
+stopwaitsecs=3600
+```
+
+Reload dan aktifkan:
+
+```bash
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl start tahfidz-worker:*
+```
+
+Jika nanti ada penjadwalan (mis. backup otomatis), daftarkan Laravel scheduler ke cron:
+
+```bash
+sudo crontab -e
+```
+
+```cron
+* * * * * cd /var/www/tahfidz && php artisan schedule:run >> /dev/null 2>&1
+```
+
+### 10. HTTPS (Let's Encrypt)
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d domain-anda.com
+```
+
+Pastikan `APP_URL` di `.env` sudah `https://`, lalu:
+
+```bash
+cd /var/www/tahfidz
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan optimize:clear
+sudo systemctl reload nginx
+```
+
+### 11. Verify
+
+Akses `https://domain-anda.com`. Login menggunakan akun seeder (lihat bagian **Akun Seeder** di bawah). Jika `SEED_USER_PASSWORD` kosong, password acak dicetak saat seeding dan tidak ditampilkan lagi.
+
+Panduan deployment/pemeliharaan yang lebih ringkas dapat dilihat pada bagian **Deployment Singkat** di bawah.
 
 ## Akun Seeder
 
@@ -297,7 +552,9 @@ php artisan test
 
 ## Deployment Singkat
 
-Untuk deployment ke server:
+> Untuk panduan lengkap instalasi di VPS (dependency, database MySQL, Nginx, queue worker, HTTPS), lihat bagian **Instalasi di VPS** di atas.
+
+Ringkasan langkah deployment ke server:
 
 1. Clone repository ke server.
 2. Jalankan `composer install --no-dev --optimize-autoloader`.
@@ -305,8 +562,9 @@ Untuk deployment ke server:
 4. Salin dan konfigurasi `.env`.
 5. Jalankan `php artisan key:generate` jika belum ada `APP_KEY`.
 6. Jalankan `php artisan migrate --force`.
-7. Jalankan `php artisan optimize:clear`.
-8. Arahkan web server ke folder `public`.
+7. Jalankan `php artisan storage:link` (jika belum) agar file upload bisa diakses.
+8. Jalankan `php artisan optimize:clear`.
+9. Arahkan web server ke folder `public`.
 
 Contoh optimasi cache untuk production:
 
