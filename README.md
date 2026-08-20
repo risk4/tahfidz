@@ -63,7 +63,7 @@ Pastikan perangkat sudah memiliki:
 - Database SQLite, MySQL, atau MariaDB
 - Git
 
-Untuk lingkungan lokal Windows, aplikasi ini dapat dijalankan menggunakan Laragon, XAMPP, atau `php artisan serve`. Untuk instalasi di VPS Linux (Ubuntu/Debian), lihat bagian **Instalasi di VPS** di bawah.
+Untuk lingkungan lokal Windows, aplikasi ini dapat dijalankan menggunakan Laragon, XAMPP, atau `php artisan serve`. Untuk instalasi di VPS (dengan **aaPanel + Nginx**), lihat bagian **Instalasi di VPS** di bawah.
 
 ## Instalasi Lokal
 
@@ -177,42 +177,52 @@ Jika menggunakan Laragon/Apache/Nginx, pastikan document root mengarah ke folder
 public
 ```
 
-## Instalasi di VPS
+## Instalasi di VPS (aaPanel + Nginx)
 
-Panduan berikut menargetkan VPS Linux (Ubuntu/Debian) dengan **Nginx + PHP-FPM** dan **MySQL/MariaDB**. Langkah ini mengasumsikan Anda sudah masuk sebagai user dengan hak `sudo` dan sudah punya domain yang mengarah ke IP VPS.
+Panduan berikut menargetkan VPS Linux yang sudah terinstall **aaPanel** (dengan **Nginx**). aaPanel akan menangani instalasi PHP, MySQL, pembuatan situs, dan SSL. Anda hanya perlu menjalankan perintah via SSH untuk Composer, npm, dan perintah Artisan.
 
-### 1. Install dependency sistem
+> Prasyarat: domain sudah diarahkan (DNS) ke IP VPS, dan Anda sudah bisa mengakses panel aaPanel serta terminal SSH.
+
+### 1. Install software via aaPanel
+
+Masuk ke panel aaPanel (biasanya `http://<IP_VPS>:8888`), lalu pada menu **App Store / Software Store** install:
+
+- **Nginx** (versi terbaru / 1.2x)
+- **MySQL** (5.7 atau 8.0)
+- **PHP** (pilih versi **8.2 atau 8.3** — aplikasi butuh PHP 8.3+)
+
+Setelah PHP terinstall, buka **PHP → Setting → Install extension** dari aaPanel dan pastikan ekstensi berikut aktif (ekstensi wajib ditandai):
+
+- `fileinfo` (wajib)
+- `openssl` (wajib)
+- `mbstring` (wajib)
+- `xml` / `dom` (wajib)
+- `curl` (wajib)
+- `zip` (wajib, untuk Composer/phpspreadsheet)
+- `gd` (untuk upload gambar)
+- `bcmath` (untuk phpspreadsheet)
+- `exif` (disarankan)
+
+Catatan: di aaPanel, perintah `php` di terminal sering mengarah ke versi PHP yang belum diaktifkan. Untuk memakai PHP versi tertentu, gunakan path lengkap, mis. `/www/server/php/83/bin/php` (sesuaikan angka versinya), atau atur sebagai alias:
 
 ```bash
-sudo apt update
-sudo apt install -y nginx mysql-server software-properties-common \
-    git unzip curl
-
-# Tambahkan repositori php sury.org (Ubuntu) agar mendapat PHP 8.3+
-sudo add-apt-repository ppa:ondrej/php -y
-sudo apt update
-
-# Install PHP 8.3 dan ekstensi yang dibutuhkan Laravel
-sudo apt install -y php8.3-fpm php8.3-cli php8.3-mbstring php8.3-xml \
-    php8.3-curl php8.3-zip php8.3-mysql php8.3-gd php8.3-intl \
-    php8.3-bcmath php8.3-sqlite3 php8.3-bz2
+php -v                        # cek apakah sudah PHP 8.3
+ls /www/server/php/           # lihat versi PHP yang terinstall di aaPanel
 ```
 
-Catatan: jika hanya memakai SQLite, ekstensi `php8.3-mysql` bisa diganti `php8.3-sqlite3` dan abaikan langkah MySQL di bawah.
-
-### 2. Install Composer dan Node.js
+### 2. Install Composer dan Node.js (via SSH)
 
 ```bash
-# Composer
+# Composer (global)
 curl -sS https://getcomposer.org/installer | php
 sudo mv composer.phar /usr/local/bin/composer
 
-# Node.js 20+ (gunakan versi LTS terbaru)
+# Node.js 20+ / 22+ (LTS)
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-Verifikasi instalasi:
+Verifikasi:
 
 ```bash
 composer --version
@@ -220,32 +230,34 @@ node -v
 npm -v
 ```
 
-### 3. Siapkan database MySQL
+Jika `composer` tidak ditemukan karena PATH user aaPanel, gunakan `php /usr/local/bin/composer ...` atau sesuaikan.
+
+### 3. Buat situs dan database di aaPanel
+
+1. Buka menu **Website → Add site**.
+2. Isi **Domain** dengan domain yang sudah diarahkan (mis. `tahfidz.example.com`).
+3. **PHP Version**: pilih **PHP 8.3**.
+4. Centang **Create Database** dan isi nama database + username + password sendiri (pastikan tipe **MySQL/utf8mb4**).
+5. Selesaikan pembuatan. Catat nama database, username, dan password yang dibuat.
+6. Lokasi root situs default aaPanel: `/www/wwwroot/tahfidz.example.com/`.
+
+### 4. Deploy kode aplikasi ke root situs
+
+Via SSH, pindah ke direktori root situs dan clone repository:
 
 ```bash
-sudo mysql
-```
+cd /www/wwwroot/tahfidz.example.com
+rm -rf *
+git clone https://github.com/risk4/tahfidz.git .
 
-Di prompt MySQL, buat database dan user khusus (ganti nilai sesuai kebutuhan):
-
-```sql
-CREATE DATABASE tahfidz_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'tahfidz'@'localhost' IDENTIFIED BY 'GANTI_DENGAN_PASSWORD_KUAT';
-GRANT ALL PRIVILEGES ON tahfidz_app.* TO 'tahfidz'@'localhost';
-FLUSH PRIVILEGES;
-EXIT;
-```
-
-### 4. Clone repository dan install dependency
-
-```bash
-cd /var/www
-sudo git clone https://github.com/risk4/tahfidz.git
-cd tahfidz
-
-sudo chown -R $USER:www-data .
+# Atur permission agar situs (user www) bisa membaca/menulis
+sudo chown -R www:www .
 sudo chmod -R 775 storage bootstrap/cache
+```
 
+Install dependency:
+
+```bash
 composer install --no-dev --optimize-autoloader
 npm install
 npm run build
@@ -255,7 +267,7 @@ npm run build
 
 ```bash
 cp .env.example .env
-php artisan key:generate
+php artisan key:generate    # atau /www/server/php/83/bin/php artisan key:generate
 ```
 
 Edit `.env`:
@@ -264,7 +276,7 @@ Edit `.env`:
 nano .env
 ```
 
-Ubah setidaknya menjadi:
+Ubah setidaknya menjadi (sesuaikan nama DB/user/password dari langkah 3):
 
 ```env
 APP_NAME="Tahfidz App"
@@ -278,9 +290,9 @@ APP_URL=https://domain-anda.com
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=tahfidz_app
-DB_USERNAME=tahfidz
-DB_PASSWORD=GANTI_DENGAN_PASSWORD_KUAT
+DB_DATABASE=NAMA_DATABASE
+DB_USERNAME=USER_DATABASE
+DB_PASSWORD=PASSWORD_DATABASE
 ```
 
 > **Tips password seeder:** jika `SEED_USER_PASSWORD` dibiarkan kosong, setiap akun seeder akan diberi password acak dan dicetak ke console saat seeding. Jika diisi, password tersebut yang dipakai untuk ketiga akun seeder — sebaiknya diubah setelah login pertama.
@@ -289,146 +301,98 @@ DB_PASSWORD=GANTI_DENGAN_PASSWORD_KUAT
 
 ```bash
 php artisan migrate --seed --force
+# atau: /www/server/php/83/bin/php artisan migrate --seed --force
 ```
 
-### 7. Set permission storage dan symlink
+### 7. Set permission dan symlink storage
 
 ```bash
-sudo chown -R www-data:www-data storage bootstrap/cache
+sudo chown -R www:www storage bootstrap/cache
 
 # Buat symlink agar file upload (mis. logo) bisa diakses publik
 php artisan storage:link
 ```
 
-### 8. Konfigurasi Nginx
+### 8. Set document root ke folder `public`
 
-Buat file konfigurasi site:
+Aplikasi Laravel mengharuskan document root mengarah ke folder `public`, bukan root situs. Di aaPanel:
 
-```bash
-sudo nano /etc/nginx/sites-available/tahfidz
-```
+1. Buka **Website → (pilih situs) → Setting / 网站目录 (Directory)**.
+2. Ubah **Document Root (运行目录)** menjadi:
+   ```txt
+   /www/wwwroot/tahfidz.example.com/public
+   ```
+3. Pastikan pengaturan **Anti-leech / 防跨站** (anti-cross-site) diarahkan juga ke direktori `public` agar folder lain di luar `public` tidak bisa diakses langsung.
+4. Simpan dan reload situs.
 
-Isi dengan (ganti `domain-anda.com` dan path sesuai lokasi repo):
+### 9. Aktifkan HTTPS (SSL)
 
-```nginx
-server {
-    listen 80;
-    server_name domain-anda.com;
-    root /var/www/tahfidz/public;
+1. Di aaPanel, buka **Website → SSL** untuk situs tersebut.
+2. Pilih **Let's Encrypt** → generate sertifikat untuk domain.
+3. Aktifkan **Force HTTPS** (强制 HTTPS) agar semua request dialihkan ke `https://`.
 
-    index index.php index.html;
-
-    charset utf-8;
-
-    location / {
-        try_files $uri $uri/ /index.php?$query_string;
-    }
-
-    # Aset statis di-cache lama; file dari symlink storage juga dilayani
-    location ~* \.(css|js|jpg|jpeg|png|gif|webp|svg|ico|woff2?)$ {
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-        try_files $uri =404;
-    }
-
-    location = /favicon.ico { access_log off; log_not_found off; }
-    location = /robots.txt  { access_log off; log_not_found off; }
-
-    error_page 404 /index.php;
-
-    location ~ \.php$ {
-        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
-        include fastcgi_params;
-    }
-
-    location ~ /\.(?!well-known).* {
-        deny all;
-    }
-
-    client_max_body_size 20M;
-}
-```
-
-Aktifkan site dan reload Nginx:
+Pastikan `APP_URL` di `.env` sudah menggunakan `https://`, lalu:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/tahfidz /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
+cd /www/wwwroot/tahfidz.example.com
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan optimize:clear
 ```
 
-### 9. Setup queue worker (Supervisor)
+### 10. Setup queue worker (Supervisor/Cron di aaPanel)
 
-Aplikasi memakai driver queue `database` (migration `jobs`). Jalankan worker agar proses async (notifikasi, dll.) berjalan. Install Supervisor:
+Aplikasi memakai driver queue `database` (migration `jobs`). Jalankan worker agar proses async (notifikasi, dll.) berjalan. aaPanel menyediakan menu **Process Daemon (守护进程 / Supervisor)**:
 
-```bash
-sudo apt install -y supervisor
-```
+1. Buka **Terminal/SSH** lalu pastikan Supervisor terinstall:
+   ```bash
+   which supervisorctl || (sudo apt update && sudo apt install -y supervisor)
+   ```
+2. Buat file konfigurasi worker:
+   ```bash
+   sudo nano /etc/supervisor/conf.d/tahfidz-worker.conf
+   ```
+   Isi dengan (sesuaikan path dan path php):
+   ```ini
+   [program:tahfidz-worker]
+   process_name=%(program_name)s_%(process_num)02d
+   command=/www/server/php/83/bin/php /www/wwwroot/tahfidz.example.com/artisan queue:work --sleep=3 --tries=3
+   directory=/www/wwwroot/tahfidz.example.com
+   autostart=true
+   autorestart=true
+   stopasgroup=true
+   killasgroup=true
+   user=www
+   numprocs=1
+   redirect_stderr=true
+   stdout_logfile=/www/wwwroot/tahfidz.example.com/storage/logs/worker.log
+   stopwaitsecs=3600
+   ```
+3. Reload dan aktifkan:
+   ```bash
+   sudo supervisorctl reread
+   sudo supervisorctl update
+   sudo supervisorctl start tahfidz-worker:*
+   ```
 
-Buat file konfigurasi:
+> Atau, jika lebih sederhana, buat **Cron** di aaPanel (menu **Cron**) yang menjalankan worker dalam interval pendek. Catatan: untuk queue worker sebaiknya menggunakan daemon (Supervisor/Process Daemon) agar berjalan terus-menerus.
 
-```bash
-sudo nano /etc/supervisor/conf.d/tahfidz-worker.conf
-```
-
-Isi dengan (sesuaikan path):
-
-```ini
-[program:tahfidz-worker]
-process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/tahfidz/artisan queue:work --sleep=3 --tries=3
-directory=/var/www/tahfidz
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-user=www-data
-numprocs=1
-redirect_stderr=true
-stdout_logfile=/var/www/tahfidz/storage/logs/worker.log
-stopwaitsecs=3600
-```
-
-Reload dan aktifkan:
-
-```bash
-sudo supervisorctl reread
-sudo supervisorctl update
-sudo supervisorctl start tahfidz-worker:*
-```
-
-Jika nanti ada penjadwalan (mis. backup otomatis), daftarkan Laravel scheduler ke cron:
+Jika nanti ada penjadwalan (mis. backup otomatis), daftarkan Laravel scheduler ke cron. Di aaPanel bisa lewat menu **Cron → Add Cron Task (Shell Script)** atau langsung lewat SSH:
 
 ```bash
 sudo crontab -e
 ```
 
 ```cron
-* * * * * cd /var/www/tahfidz && php artisan schedule:run >> /dev/null 2>&1
-```
-
-### 10. HTTPS (Let's Encrypt)
-
-```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d domain-anda.com
-```
-
-Pastikan `APP_URL` di `.env` sudah `https://`, lalu:
-
-```bash
-cd /var/www/tahfidz
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-php artisan optimize:clear
-sudo systemctl reload nginx
+* * * * * cd /www/wwwroot/tahfidz.example.com && /www/server/php/83/bin/php artisan schedule:run >> /dev/null 2>&1
 ```
 
 ### 11. Verify
 
 Akses `https://domain-anda.com`. Login menggunakan akun seeder (lihat bagian **Akun Seeder** di bawah). Jika `SEED_USER_PASSWORD` kosong, password acak dicetak saat seeding dan tidak ditampilkan lagi.
+
+Gunakan menu **Website → Monitoring / Error log** di aaPanel jika terjadi kendala, atau cek log aplikasi di `storage/logs/laravel.log`.
 
 Panduan deployment/pemeliharaan yang lebih ringkas dapat dilihat pada bagian **Deployment Singkat** di bawah.
 
@@ -552,7 +516,7 @@ php artisan test
 
 ## Deployment Singkat
 
-> Untuk panduan lengkap instalasi di VPS (dependency, database MySQL, Nginx, queue worker, HTTPS), lihat bagian **Instalasi di VPS** di atas.
+> Untuk panduan lengkap instalasi di VPS berbasis **aaPanel + Nginx** (install software, buat situs/database, document root, SSL, queue worker), lihat bagian **Instalasi di VPS** di atas.
 
 Ringkasan langkah deployment ke server:
 
