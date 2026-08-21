@@ -393,20 +393,56 @@ function DashboardPreview() {
 
 function Hero() {
   return (
-    <section id="beranda" className="relative overflow-hidden bg-emerald-50/40">
-      <div className="mx-auto grid max-w-7xl gap-12 px-6 py-16 lg:grid-cols-2 lg:items-center lg:px-10 lg:py-24">
+    <section id="beranda" className="relative overflow-hidden bg-gradient-to-br from-[#075B30] to-[#0D753F]">
+      {/* ===== Decorative elements — sama persis dengan LoginBrandPanel ===== */}
+      {/* Islamic geometric pattern */}
+      <svg className="absolute inset-0 h-full w-full text-white opacity-[0.04]" aria-hidden="true">
+        <defs>
+          <pattern id="hero-islamic-pattern" width="72" height="72" patternUnits="userSpaceOnUse">
+            <g fill="none" stroke="currentColor" strokeWidth="1">
+              <path d="M36 4 L68 36 L36 68 L4 36 Z" />
+              <path d="M36 14 L58 36 L36 58 L14 36 Z" />
+              <circle cx="36" cy="36" r="2.5" />
+            </g>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#hero-islamic-pattern)" />
+      </svg>
+
+      {/* Large transparent circle — top right */}
+      <div className="absolute -right-28 -top-28 h-96 w-96 rounded-full bg-white/[0.05] blur-2xl" aria-hidden="true" />
+      {/* Small circle — bottom left */}
+      <div className="absolute -bottom-12 -left-12 h-44 w-44 rounded-full bg-white/[0.06]" aria-hidden="true" />
+      {/* Subtle green glow — center */}
+      <div className="absolute left-1/3 top-1/2 h-64 w-64 rounded-full bg-[#7EE2B8]/[0.08] blur-3xl" aria-hidden="true" />
+      {/* Extra glow — right side untuk area DashboardPreview */}
+      <div className="absolute right-1/4 bottom-1/4 h-80 w-80 rounded-full bg-[#7EE2B8]/[0.06] blur-3xl" aria-hidden="true" />
+
+      {/* Abstract curved shape — bottom right */}
+      <svg
+        className="absolute -bottom-10 -right-10 h-64 w-64 text-white opacity-[0.06]"
+        viewBox="0 0 200 200"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path d="M150 20 C60 50 50 140 160 165" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M185 45 C95 80 90 160 185 185" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6" />
+      </svg>
+
+      {/* ===== Content ===== */}
+      <div className="relative z-10 mx-auto grid max-w-7xl gap-12 px-6 py-16 lg:grid-cols-2 lg:items-center lg:px-10 lg:py-24">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3.5 py-1.5 text-xs font-semibold text-amber-700 animate-fade-up">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-[#7EE2B8] ring-1 ring-white/10 animate-fade-up">
             <Moon className="h-3.5 w-3.5" /> APLIKASI TAHFIDZ QUR'AN
           </span>
 
-          <h1 className="mt-5 text-4xl font-extrabold leading-[1.15] text-slate-900 sm:text-5xl animate-fade-up [animation-delay:100ms]">
+          <h1 className="mt-5 text-4xl font-extrabold leading-[1.15] text-white sm:text-5xl animate-fade-up [animation-delay:100ms]">
             Teman Terbaik Dalam Perjalanan
             <br className="hidden sm:block" /> Hafalan{" "}
-            <span className="text-emerald-600">Al-Qur'an</span>
+            <span className="text-[#7EE2B8]">Al-Qur'an</span>
           </h1>
 
-          <p className="mt-5 max-w-lg text-slate-500 animate-fade-up [animation-delay:200ms]">
+          <p className="mt-5 max-w-lg text-white/75 animate-fade-up [animation-delay:200ms]">
             Kelola hafalan, setoran, dan muroja'ah dengan mudah. Pantau
             perkembangan hafalan Anda kapan saja dan di mana saja.
           </p>
@@ -414,41 +450,41 @@ function Hero() {
           <div className="mt-7 flex flex-wrap items-center gap-3 animate-fade-up [animation-delay:300ms]">
             <Link
               to="/login"
-              className="inline-flex items-center gap-2 rounded-full bg-[#0D753F] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#0D753F]/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#075B30] active:scale-95 animate-pulse-ring"
+              className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#075B30] shadow-lg shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#7EE2B8] active:scale-95 animate-pulse-ring"
             >
               Mulai Sekarang <ArrowRight className="h-4 w-4" />
             </Link>
-            <button className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 active:scale-95">
+            <button className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/20 active:scale-95">
               <Play className="h-3.5 w-3.5" fill="currentColor" /> Lihat Demo
             </button>
           </div>
 
           <div className="mt-10 flex flex-wrap gap-8 animate-fade-up [animation-delay:400ms]">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100">
-                <Users className="h-4.5 w-4.5 text-emerald-600" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
+                <Users className="h-4.5 w-4.5 text-[#7EE2B8]" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-900">1000+</p>
-                <p className="text-xs text-slate-400">Pengguna Aktif</p>
+                <p className="text-sm font-bold text-white">1000+</p>
+                <p className="text-xs text-white/60">Pengguna Aktif</p>
               </div>
             </div>
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100">
-                <BookOpen className="h-4.5 w-4.5 text-emerald-600" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
+                <BookOpen className="h-4.5 w-4.5 text-[#7EE2B8]" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-900">50.000+</p>
-                <p className="text-xs text-slate-400">Setoran Hafalan</p>
+                <p className="text-sm font-bold text-white">50.000+</p>
+                <p className="text-xs text-white/60">Setoran Hafalan</p>
               </div>
             </div>
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100">
-                <Star className="h-4.5 w-4.5 text-emerald-600" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
+                <Star className="h-4.5 w-4.5 text-[#7EE2B8]" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-900">99%</p>
-                <p className="text-xs text-slate-400">Kepuasan Pengguna</p>
+                <p className="text-sm font-bold text-white">99%</p>
+                <p className="text-xs text-white/60">Kepuasan Pengguna</p>
               </div>
             </div>
           </div>
