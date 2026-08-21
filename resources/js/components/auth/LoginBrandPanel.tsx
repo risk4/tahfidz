@@ -1,8 +1,7 @@
 import { BookOpen, ChartNoAxesCombined, ShieldCheck, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { LoginFeature } from '@/components/auth/LoginFeature';
-import { settingsService } from '@/services/api';
-import type { AppSettings } from '@/types';
+import { brandingService } from '@/services/api';
 
 const features = [
   { icon: Users, title: 'Kelola santri dengan mudah', description: 'Data santri, kelas, dan pembimbing terorganisir.' },
@@ -12,19 +11,18 @@ const features = [
 ];
 
 export function LoginBrandPanel() {
-  // Hanya ambil pengaturan bila sudah login (ada token). Tanpa guard ini,
-  // request di halaman login akan mengembalikan 401 → interceptor redirect
-  // ke /login → halaman dimuat ulang terus-menerus.
-  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('token');
-  const { data: settings } = useQuery<AppSettings>({
-    queryKey: ['settings'],
-    queryFn: () => settingsService.all(),
-    enabled: hasToken,
-    staleTime: 5 * 60 * 1000,
+  // Gunakan endpoint publik /api/branding — tidak memerlukan token.
+  // Dengan begitu logo & nama app selalu tampil di halaman login
+  // tanpa bergantung pada status autentikasi user.
+  const { data: branding } = useQuery({
+    queryKey: ['branding'],
+    queryFn: () => brandingService.get(),
+    staleTime: 5 * 60 * 1000, // 5 menit — jarang berubah
+    gcTime: 30 * 60 * 1000,   // simpan cache 30 menit agar tetap ada saat logout lalu kembali ke /login
+    retry: 1,
   });
-  const logoPath = settings?.application?.logo_path ?? settings?.profile?.logo_path ?? null;
-  const logoUrl = logoPath ? `/storage/${logoPath}` : null;
-  const appName = settings?.application?.app_name || settings?.profile?.name || null;
+  const logoUrl = branding?.logo_path ? `/storage/${branding.logo_path}` : null;
+  const appName = branding?.app_name ?? null;
 
   return (
     <aside className="relative hidden overflow-hidden bg-gradient-to-br from-[#075B30] to-[#0D753F] text-white md:flex">

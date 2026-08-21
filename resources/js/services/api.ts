@@ -1,4 +1,5 @@
 import api from '@/lib/api';
+import axios from 'axios';
 import type {
   ActivityLog,
   AppSettings,
@@ -809,6 +810,23 @@ export const settingsService = {
 
   async testEmail(to?: string): Promise<{ status: 'sent' | 'failed'; message: string }> {
     const response = await api.post('/settings/test-email', { to });
+    return response.data;
+  },
+};
+
+/**
+ * Endpoint publik — tidak memerlukan autentikasi.
+ * Digunakan untuk menampilkan logo & nama aplikasi di halaman login
+ * sebelum user masuk, sehingga tidak ada guard token yang bisa
+ * menyebabkan logo "muncul sebentar lalu hilang".
+ */
+export const brandingService = {
+  async get(): Promise<{ app_name: string | null; logo_path: string | null }> {
+    // Gunakan axios biasa (bukan instance `api`) agar interceptor 401
+    // tidak memicu redirect ke /login saat request ini gagal.
+    const response = await axios.get<{ app_name: string | null; logo_path: string | null }>(
+      '/api/branding',
+    );
     return response.data;
   },
 };

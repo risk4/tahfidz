@@ -17,6 +17,11 @@ use App\Http\Controllers\Api\Notifications\NotificationController;
 use App\Http\Controllers\Api\Settings\SettingsController;
 use Illuminate\Support\Facades\Route;
 
+// ===== PUBLIC — tidak memerlukan autentikasi =====
+// Branding info (nama app + logo) untuk halaman login.
+Route::get('/branding', [SettingsController::class, 'branding'])
+    ->middleware('throttle:60,1');
+
 // ===== AUTH =====
 Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1'); // rate limit login: 10x/menit

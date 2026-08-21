@@ -38,6 +38,23 @@ class SettingsController extends Controller
         return response()->json($this->settings->all());
     }
 
+    /**
+     * GET /api/branding — informasi publik untuk halaman login.
+     *
+     * Tidak memerlukan autentikasi sehingga logo & nama aplikasi
+     * bisa ditampilkan sebelum user masuk.
+     */
+    public function branding()
+    {
+        $profile     = $this->settings->group('profile');
+        $application = $this->settings->group('application');
+
+        return response()->json([
+            'app_name'  => $application['app_name']  ?? $profile['name'] ?? null,
+            'logo_path' => $application['logo_path']  ?? $profile['logo_path'] ?? null,
+        ]);
+    }
+
     /** PUT /api/settings/{group} — simpan satu group pengaturan. */
     public function update(UpdateSettingsRequest $request, string $group)
     {
