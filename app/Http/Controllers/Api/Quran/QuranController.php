@@ -130,6 +130,13 @@ class QuranController extends Controller
         return response()->json($query->get());
     }
 
+    /**
+     * Pengisian teks ayat dari API eksternal dilakukan sekali per surah.
+     * Cache lock mencegah stampede: saat banyak request paralel menyentuh
+     * surah yang masih placeholder, hanya satu proses yang memanggil API
+     * eksternal — sisanya langsung dilayani data lokal. Timeout juga
+     * dipangkas agar request tidak menggantung terlalu lama.
+     */
     private function ensureRealAyahText(QuranSurah $surah): void
     {
         $hasPlaceholder = QuranAyah::where('surah_id', $surah->id)
@@ -140,8 +147,14 @@ class QuranController extends Controller
             return;
         }
 
+        $lock = Cache::lock("quran.fill.{$surah->id}", 60);
+
+        if (! $lock->get()) {
+            return; // proses lain sedang mengisi — sajikan data lokal dulu
+        }
+
         try {
-            $arabicResponse = Http::timeout(15)
+            $arabicResponse = Http::timeout(8)
                 ->get("https://api.alquran.cloud/v1/surah/{$surah->surah_number}/quran-uthmani");
 
             if (! $arabicResponse->successful()) {
@@ -151,7 +164,7 @@ class QuranController extends Controller
             $arabicAyahs = collect($arabicResponse->json('data.ayahs', []))
                 ->keyBy('numberInSurah');
 
-            $translationResponse = Http::timeout(15)
+            $translationResponse = Http::timeout(8)
                 ->get("https://api.alquran.cloud/v1/surah/{$surah->surah_number}/id.indonesian");
 
             $translationAyahs = $translationResponse->successful()
@@ -159,6 +172,7 @@ class QuranController extends Controller
                 : collect();
 
             QuranAyah::where('surah_id', $surah->id)
+                ->where('text_arabic', 'like', '{%}')
                 ->get(['id', 'ayah_number'])
                 ->each(function (QuranAyah $ayah) use ($arabicAyahs, $translationAyahs) {
                     $arabic = $arabicAyahs->get($ayah->ayah_number);
@@ -175,6 +189,8 @@ class QuranController extends Controller
                 });
         } catch (\Throwable) {
             // Jika internet/API eksternal tidak tersedia, endpoint tetap mengembalikan data lokal.
+        } finally {
+            $lock->release();
         }
     }
 }

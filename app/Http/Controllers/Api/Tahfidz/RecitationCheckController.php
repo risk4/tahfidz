@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Tahfidz;
 
+use App\Domain\People\Support\SupervisedStudentScope;
 use App\Domain\Settings\Services\SettingsService;
 use App\Domain\Tahfidz\Models\RecitationCheck;
 use App\Domain\Tahfidz\Services\RecitationCheckService;
@@ -19,8 +20,7 @@ class RecitationCheckController extends Controller
     public function __construct(
         private readonly RecitationCheckService $recitationCheckService,
         private readonly SettingsService $settings,
-    ) {
-    }
+    ) {}
 
     /** GET /api/recitation-checks/config — flag penyimpanan riwayat. */
     public function config(Request $request)
@@ -39,17 +39,11 @@ class RecitationCheckController extends Controller
             ->with(['student.classRoom', 'surah']);
 
         // Guru hanya melihat riwayat siswa binaannya (wali kelas / halaqah).
-        if ($request->user()->isTeacher()) {
-            $teacherId = $request->user()->teacher?->id;
-            $query->whereHas('student', function ($student) use ($teacherId) {
-                $student->where(function ($q) use ($teacherId) {
-                    $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
-                        ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
-                });
-            });
-        } elseif ($request->user()->isStudent()) {
+        SupervisedStudentScope::apply($query, $request->user(), viaRelation: true);
+
+        if ($request->user()->isStudent()) {
             // Siswa hanya melihat riwayat miliknya sendiri.
-            $query->where('student_id', $request->user()->student?->id);
+            $query->where('student_id', $request->user()->student?->id ?? 0);
         }
 
         if ($studentId = $request->integer('student_id')) {

@@ -23,27 +23,51 @@ log "========================================"
 # --------------------------------------------------------------------------
 # 1. Pull kode terbaru dari GitHub
 # --------------------------------------------------------------------------
-log "1/5 · Menarik kode terbaru dari GitHub..."
+log "1/6 · Menarik kode terbaru dari GitHub..."
 git pull origin main || fail "git pull gagal"
 
 # --------------------------------------------------------------------------
-# 2. Install / update PHP dependencies
+# 2. Validasi konfigurasi produksi (.env)
 # --------------------------------------------------------------------------
-log "2/5 · Menginstall PHP dependencies..."
+# Kegagalan konfigurasi berbahaya (debug aktif / APP_KEY kosong) harus
+# menghentikan deploy sebelum aplikasi melayani trafik.
+log "2/6 · Memeriksa konfigurasi produksi..."
+
+if [ ! -f .env ]; then
+  fail "File .env tidak ditemukan. Salin .env.example dan sesuaikan dulu."
+fi
+
+APP_ENV_VAL=$(sed -n 's/^APP_ENV=//p' .env | tail -n 1 | tr -d '"' | tr -d ' ')
+APP_DEBUG_VAL=$(sed -n 's/^APP_DEBUG=//p' .env | tail -n 1 | tr -d '"' | tr -d ' ')
+
+if [ "$APP_ENV_VAL" = "production" ]; then
+  if [ "$APP_DEBUG_VAL" != "false" ]; then
+    fail "APP_DEBUG harus 'false' saat APP_ENV=production (kebocoran informasi sensitif)."
+  fi
+
+  if ! grep -qE '^APP_KEY=base64:.+' .env; then
+    fail "APP_KEY belum di-generate. Jalankan: php artisan key:generate"
+  fi
+fi
+
+# --------------------------------------------------------------------------
+# 3. Install / update PHP dependencies
+# --------------------------------------------------------------------------
+log "3/6 · Menginstall PHP dependencies..."
 composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev \
   || fail "composer install gagal"
 
 # --------------------------------------------------------------------------
-# 3. Build frontend assets
+# 4. Build frontend assets
 # --------------------------------------------------------------------------
-log "3/5 · Membangun frontend assets (npm run build)..."
+log "4/6 · Membangun frontend assets (npm run build)..."
 npm ci --prefer-offline 2>/dev/null || npm install
 npm run build || fail "npm run build gagal"
 
 # --------------------------------------------------------------------------
-# 4. Laravel housekeeping
+# 5. Laravel housekeeping
 # --------------------------------------------------------------------------
-log "4/5 · Menjalankan perintah Laravel..."
+log "5/6 · Menjalankan perintah Laravel..."
 
 php artisan migrate --force        || fail "migrate gagal"
 php artisan storage:link 2>/dev/null || warn "storage:link sudah ada, dilewati"
@@ -56,9 +80,9 @@ php artisan route:cache
 php artisan view:cache
 
 # --------------------------------------------------------------------------
-# 5. Set permission direktori storage & cache
+# 6. Set permission direktori storage & cache
 # --------------------------------------------------------------------------
-log "5/5 · Mengatur permission storage & bootstrap/cache..."
+log "6/6 · Mengatur permission storage & bootstrap/cache..."
 chmod -R 775 storage bootstrap/cache
 # Sesuaikan owner jika perlu (uncomment baris di bawah dan ganti www-data
 # dengan user web server di VPS Anda, misalnya: www-data, nginx, nobody)

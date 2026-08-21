@@ -36,8 +36,10 @@ class TeacherController extends Controller
             ->withCount(['submissions', 'murajaahs', 'tahfidzGroups']);
 
         // Guru hanya boleh melihat data dirinya sendiri di listing.
+        // Tanpa profil Teacher → hasil kosong (whereKey(0) tidak pernah match,
+        // bukan whereNull yang berbahaya pada kolom lain).
         if ($request->user()->isTeacher()) {
-            $query->where('id', $request->user()->teacher?->id);
+            $query->whereKey($request->user()->teacher?->id ?? 0);
         }
 
         if ($search = $request->string('search')->toString()) {
@@ -226,7 +228,13 @@ class TeacherController extends Controller
 
             if ($password) {
                 if ($teacher->user) {
-                    $teacher->user->update(['password' => Hash::make($password)]);
+                    // Password di-reset oleh admin: wajibkan ganti password saat
+                    // login berikutnya dan matikan sesi lama guru tersebut.
+                    $teacher->user->forceFill([
+                        'password' => Hash::make($password),
+                        'must_change_password' => true,
+                    ])->save();
+                    $teacher->user->tokens()->delete();
                 } else {
                     $email = $data['email'] ?? $teacher->email;
                     abort_if(! $email, 422, 'Email wajib diisi untuk membuat akun login.');
@@ -251,7 +259,19 @@ class TeacherController extends Controller
     {
         $this->authorize('delete', $teacher);
 
-        $teacher->delete();
+        DB::transaction(function () use ($teacher) {
+            // Ambil akun login sebelum record dihapus agar relasinya tetap bisa dibaca.
+            $user = $teacher->user;
+
+            $teacher->delete();
+
+            // Akun tanpa data guru tidak boleh tetap bisa login:
+            // nonaktifkan akun dan cabut seluruh token Sanctum miliknya.
+            if ($user) {
+                $user->forceFill(['is_active' => false])->save();
+                $user->tokens()->delete();
+            }
+        });
 
         return response()->json(['message' => 'Guru berhasil dihapus.']);
     }
@@ -374,7 +394,7 @@ class TeacherController extends Controller
         ];
 
         $format = $this->resolveExportFormat($request->query('format'));
-        $filename = 'template_import_guru.' . ($format === 'xlsx' ? 'xlsx' : 'csv');
+        $filename = 'template_import_guru.'.($format === 'xlsx' ? 'xlsx' : 'csv');
 
         return $format === 'xlsx'
             ? $this->xlsxDownload($filename, $headers, [$example])
@@ -390,7 +410,7 @@ class TeacherController extends Controller
             ->withCount(['tahfidzGroups']);
 
         if ($request->user()->isTeacher()) {
-            $query->where('id', $request->user()->teacher?->id);
+            $query->whereKey($request->user()->teacher?->id ?? 0);
         }
         if ($search = $request->string('search')->toString()) {
             $query->where(function ($q) use ($search) {
@@ -460,7 +480,7 @@ class TeacherController extends Controller
         })->all();
 
         $format = $this->resolveExportFormat($request->query('format'));
-        $filename = 'export_guru_' . now()->format('Ymd_His') . ($format === 'xlsx' ? '.xlsx' : '.csv');
+        $filename = 'export_guru_'.now()->format('Ymd_His').($format === 'xlsx' ? '.xlsx' : '.csv');
 
         return $format === 'xlsx'
             ? $this->xlsxDownload($filename, $headers, $rows)
@@ -477,7 +497,7 @@ class TeacherController extends Controller
         try {
             [$headerRow, $dataRows] = $this->readRowsFromFile($file);
         } catch (\Throwable $e) {
-            return response()->json(['message' => 'Gagal membaca file: ' . $e->getMessage()], 422);
+            return response()->json(['message' => 'Gagal membaca file: '.$e->getMessage()], 422);
         }
 
         if (empty($headerRow)) {
@@ -487,7 +507,7 @@ class TeacherController extends Controller
         $headerRow = array_map(fn ($h) => strtolower(trim((string) $h)), $headerRow);
         $missing = array_diff(['teacher_code', 'name'], $headerRow);
         if ($missing) {
-            return response()->json(['message' => 'Kolom wajib tidak ditemukan: ' . implode(', ', $missing)], 422);
+            return response()->json(['message' => 'Kolom wajib tidak ditemukan: '.implode(', ', $missing)], 422);
         }
 
         $mode = strtolower((string) $request->input('mode', 'update'));
@@ -503,11 +523,11 @@ class TeacherController extends Controller
         } catch (\Throwable $e) {
             DB::rollBack();
 
-            return response()->json(['message' => 'Terjadi kesalahan: ' . $e->getMessage()], 500);
+            return response()->json(['message' => 'Terjadi kesalahan: '.$e->getMessage()], 500);
         }
 
         return response()->json([
-            'message' => 'Import selesai. ' . $imported . ' data berhasil diimpor.' . (count($skipped) ? ' ' . count($skipped) . ' baris dilewati.' : ''),
+            'message' => 'Import selesai. '.$imported.' data berhasil diimpor.'.(count($skipped) ? ' '.count($skipped).' baris dilewati.' : ''),
             'imported' => $imported,
             'skipped' => $skipped,
         ]);
@@ -550,6 +570,7 @@ class TeacherController extends Controller
 
             if ($validator->fails()) {
                 $skipped[] = ['row' => $rowNum, 'data' => $data['teacher_code'] ?? "(baris {$rowNum})", 'errors' => $validator->errors()->all()];
+
                 continue;
             }
 
@@ -557,6 +578,7 @@ class TeacherController extends Controller
 
             if ($existing && $mode === 'insert_only') {
                 $skipped[] = ['row' => $rowNum, 'data' => $data['teacher_code'], 'errors' => ['teacher_code sudah ada (mode insert only).']];
+
                 continue;
             }
 
@@ -614,9 +636,9 @@ class TeacherController extends Controller
                 'type' => 'submission',
                 'student_name' => $s->student?->name ?? 'Santri',
                 'action' => 'Memeriksa setoran',
-                'detail' => trim(($s->surah?->name_latin ?? '') . ' ' . ($s->start_ayah && $s->end_ayah ? "ayat {$s->start_ayah}-{$s->end_ayah}" : '')),
+                'detail' => trim(($s->surah?->name_latin ?? '').' '.($s->start_ayah && $s->end_ayah ? "ayat {$s->start_ayah}-{$s->end_ayah}" : '')),
                 'datetime' => $s->submission_time
-                    ? $s->submission_date->format('Y-m-d') . ' ' . $s->submission_time
+                    ? $s->submission_date->format('Y-m-d').' '.$s->submission_time
                     : $s->submission_date?->format('Y-m-d'),
                 'time' => $s->submission_time,
             ]);
@@ -634,7 +656,7 @@ class TeacherController extends Controller
                 'action' => 'Membimbing murajaah',
                 'detail' => $m->juz ? "Juz {$m->juz}" : (string) ($m->surah?->name_latin ?? ''),
                 'datetime' => $m->time
-                    ? $m->date->format('Y-m-d') . ' ' . $m->time
+                    ? $m->date->format('Y-m-d').' '.$m->time
                     : $m->date?->format('Y-m-d'),
                 'time' => $m->time,
             ]);
@@ -705,7 +727,7 @@ class TeacherController extends Controller
         $value = (string) ($value ?? '');
 
         if ($value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
-            return "'" . $value;
+            return "'".$value;
         }
 
         return $value;
@@ -731,11 +753,11 @@ class TeacherController extends Controller
 
     private function xlsxDownload(string $filename, array $headers, array $rows): BinaryFileResponse
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
 
         $sheet->fromArray($headers, null, 'A1');
-        $sheet->getStyle('A1:' . $sheet->getHighestDataColumn() . '1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:'.$sheet->getHighestDataColumn().'1')->getFont()->setBold(true);
 
         if ($rows !== []) {
             $sheet->fromArray($rows, null, 'A2');

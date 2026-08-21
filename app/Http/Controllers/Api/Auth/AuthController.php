@@ -16,8 +16,7 @@ class AuthController extends Controller
     public function __construct(
         private readonly AuditLogService $auditLog,
         private readonly NotificationService $notifications,
-    ) {
-    }
+    ) {}
 
     public function login(Request $request)
     {
@@ -130,6 +129,10 @@ class AuthController extends Controller
                 'must_change_password' => false,
             ])->save();
 
+            // Reset lewat email terjadi tanpa sesi aktif: cabut semua token
+            // Sanctum agar sesi lama (mis. perangkat hilang) ikut mati.
+            $user->tokens()->delete();
+
             $this->auditLog->record($user, 'reset_password', User::class, $user->id, request());
         });
 
@@ -167,6 +170,13 @@ class AuthController extends Controller
             'password' => $data['password'],
             'must_change_password' => false,
         ])->save();
+
+        // Rotasi sesi: token lain tetap aktif setelah ganti password menjadi
+        // celah (perangkat hilang / token curian tidak ikut mati).
+        $currentTokenId = $user->currentAccessToken()?->id;
+        $user->tokens()
+            ->when($currentTokenId, fn ($query) => $query->where('id', '!=', $currentTokenId))
+            ->delete();
 
         $this->auditLog->record($user, 'change_password', User::class, $user->id, $request);
 

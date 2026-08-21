@@ -2,14 +2,18 @@
 
 namespace App\Http\Requests\Tahfidz;
 
+use App\Domain\Quran\Models\QuranSurah;
+use App\Domain\Tahfidz\Models\Submission;
+use App\Rules\AudioPath;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreSubmissionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('create', \App\Domain\Tahfidz\Models\Submission::class);
+        return $this->user()->can('create', Submission::class);
     }
 
     public function rules(): array
@@ -30,17 +34,17 @@ class StoreSubmissionRequest extends FormRequest
             'makhraj_score' => ['required', 'integer', 'min:0', 'max:100'],
             'fashahah_score' => ['required', 'integer', 'min:0', 'max:100'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'audio_path' => ['nullable', 'string', 'max:255'],
+            'audio_path' => ['nullable', 'string', 'max:255', new AudioPath],
         ];
     }
 
     /**
      * Pastikan rentang ayat tidak melebihi jumlah ayat pada surah.
      */
-    public function withValidator(\Illuminate\Validation\Validator $validator): void
+    public function withValidator(Validator $validator): void
     {
         $validator->after(function ($validator) {
-            $surah = \App\Domain\Quran\Models\QuranSurah::find($this->integer('surah_id'));
+            $surah = QuranSurah::find($this->integer('surah_id'));
 
             if ($surah && $this->integer('end_ayah') > $surah->total_ayahs) {
                 $validator->errors()->add(

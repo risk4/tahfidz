@@ -28,9 +28,7 @@ class NotificationService
         'system' => 'Pemberitahuan Sistem',
     ];
 
-    public function __construct(private readonly SettingsService $settings)
-    {
-    }
+    public function __construct(private readonly SettingsService $settings) {}
 
     /**
      * Kirim notifikasi email bertipe `$type` (kunci toggle/template di
@@ -167,6 +165,9 @@ class NotificationService
 
     private function renderResetEmail(string $appName, string $resetUrl): string
     {
+        // Nama aplikasi berasal dari input pengguna (Pengaturan → Aplikasi);
+        // escape agar tidak bisa menyuntik HTML/JS ke email reset.
+        $appName = htmlspecialchars($appName, ENT_QUOTES, 'UTF-8');
         $link = htmlspecialchars($resetUrl, ENT_QUOTES, 'UTF-8');
 
         return <<<HTML

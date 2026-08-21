@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Tahfidz;
 
 use App\Domain\People\Models\Student;
 use App\Domain\People\Models\User;
+use App\Domain\People\Support\SupervisedStudentScope;
 use App\Domain\Tahfidz\Models\StudentAyahCoverage;
 use App\Domain\Tahfidz\Models\StudentProgressSummary;
 use App\Domain\Tahfidz\Services\ProgressService;
@@ -15,18 +16,24 @@ class ProgressController extends Controller
 {
     public function __construct(
         private readonly ProgressService $progressService,
-    ) {
-    }
+    ) {}
 
     /**
      * Ringkasan progres seorang siswa.
+     *
+     * Membaca snapshot yang tersimpan; recompute hanya dilakukan bila
+     * ringkasan belum ada (inisialisasi pertama). Semua mutasi data
+     * (submission CRUD, status ayat, perubahan target santri) sudah
+     * memicu recompute masing-masing, sehingga endpoint GET tidak boleh
+     * melakukan penulisan ke database.
      */
     public function show(Request $request, Student $student)
     {
         $user = $request->user();
         $this->authorizeShow($user, $student);
 
-        $summary = $this->progressService->recompute($student);
+        $summary = StudentProgressSummary::find($student->id)
+            ?? $this->progressService->recompute($student);
 
         return response()->json([
             'student' => $student->only(['id', 'name', 'student_code', 'class_id']),
@@ -49,15 +56,7 @@ class ProgressController extends Controller
         $query = StudentProgressSummary::query()
             ->with(['student:id,name,student_code,class_id,memorization_target,starting_juz', 'student.classRoom:id,name']);
 
-        if ($user->isTeacher()) {
-            $teacherId = $user->teacher?->id;
-            $query->whereHas('student', function ($student) use ($teacherId) {
-                $student->where(function ($q) use ($teacherId) {
-                    $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
-                        ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
-                });
-            });
-        }
+        SupervisedStudentScope::apply($query, $user, viaRelation: true);
 
         if ($classId = $request->integer('class_id')) {
             $query->whereHas('student', fn ($q) => $q->where('class_id', $classId));
@@ -86,15 +85,7 @@ class ProgressController extends Controller
 
         $query = StudentProgressSummary::query();
 
-        if ($user->isTeacher()) {
-            $teacherId = $user->teacher?->id;
-            $query->whereHas('student', function ($student) use ($teacherId) {
-                $student->where(function ($q) use ($teacherId) {
-                    $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
-                        ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
-                });
-            });
-        }
+        SupervisedStudentScope::apply($query, $user, viaRelation: true);
 
         if ($classId = $request->integer('class_id')) {
             $query->whereHas('student', fn ($q) => $q->where('class_id', $classId));

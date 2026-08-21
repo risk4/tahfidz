@@ -27,8 +27,7 @@ class SettingsController extends Controller
         private readonly SettingsService $settings,
         private readonly AuditLogService $auditLog,
         private readonly NotificationService $notifications,
-    ) {
-    }
+    ) {}
 
     /** GET /api/settings — seluruh pengaturan, nilai rahasia termasking. */
     public function index(Request $request)
@@ -46,12 +45,12 @@ class SettingsController extends Controller
      */
     public function branding()
     {
-        $profile     = $this->settings->group('profile');
+        $profile = $this->settings->group('profile');
         $application = $this->settings->group('application');
 
         return response()->json([
-            'app_name'  => $application['app_name']  ?? $profile['name'] ?? null,
-            'logo_path' => $application['logo_path']  ?? $profile['logo_path'] ?? null,
+            'app_name' => $application['app_name'] ?? $profile['name'] ?? null,
+            'logo_path' => $application['logo_path'] ?? $profile['logo_path'] ?? null,
         ]);
     }
 
@@ -75,9 +74,11 @@ class SettingsController extends Controller
         return response()->json(['path' => $path]);
     }
 
-    /** DELETE /api/settings/logo — hapus logo. */
+    /** DELETE /api/settings/logo — hapus logo (khusus super admin via policy). */
     public function deleteLogo(Request $request)
     {
+        $this->authorize('update', AppSetting::class);
+
         $request->validate([
             'key' => ['required', Rule::in(['profile.logo_path', 'application.logo_path', 'application.favicon_path'])],
         ]);
@@ -157,11 +158,18 @@ class SettingsController extends Controller
     {
         $this->authorize('update', AppSetting::class);
 
-        DB::table('audit_logs')->delete();
+        // Retensi minimum 24 jam: jejak aktivitas terbaru selalu tersisa agar
+        // insiden keamanan masih dapat diinvestigasi meskipun admin menghapus
+        // log. Hanya log yang lebih tua dari satu hari yang dihapus.
+        $deleted = DB::table('audit_logs')
+            ->where('created_at', '<', now()->subDay())
+            ->delete();
 
         $this->auditLog->record($request->user(), 'clear_activity_logs', 'activity_log', null, $request);
 
-        return response()->json(['message' => 'Semua log aktivitas berhasil dihapus.']);
+        return response()->json([
+            'message' => "{$deleted} log aktivitas yang lebih lama dari 24 jam berhasil dihapus.",
+        ]);
     }
 
     /** GET /api/settings/sessions — sesi (token Sanctum) akun saat ini. */

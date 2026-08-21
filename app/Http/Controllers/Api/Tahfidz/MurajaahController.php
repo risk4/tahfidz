@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Api\Tahfidz;
 
 use App\Domain\Academic\Models\AcademicYear;
-use App\Domain\People\Models\Student;
 use App\Domain\People\Models\Teacher;
+use App\Domain\People\Support\SupervisedStudentScope;
 use App\Domain\Quran\Models\QuranSurah;
 use App\Domain\Tahfidz\Models\Murajaah;
 use App\Domain\Tahfidz\Models\StudentAyahCoverage;
-use App\Domain\Tahfidz\Services\ProgressService;
 use App\Domain\Tahfidz\Services\MurajaahService;
+use App\Domain\Tahfidz\Services\ProgressService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tahfidz\StoreMurajaahRequest;
 use Illuminate\Http\Request;
@@ -25,8 +25,7 @@ class MurajaahController extends Controller
     public function __construct(
         private readonly MurajaahService $murajaahService,
         private readonly ProgressService $progressService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -37,15 +36,7 @@ class MurajaahController extends Controller
 
         // Guru hanya melihat murajaah siswa binaannya: murid kelas yang ia wali
         // (homeroom) ATAU murid dalam kelompok tahfidz binaannya.
-        if ($request->user()->isTeacher()) {
-            $teacherId = $request->user()->teacher?->id;
-            $query->whereHas('student', function ($student) use ($teacherId) {
-                $student->where(function ($q) use ($teacherId) {
-                    $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
-                        ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
-                });
-            });
-        }
+        SupervisedStudentScope::apply($query, $request->user(), viaRelation: true);
 
         if ($studentId = $request->integer('student_id')) {
             $query->where('student_id', $studentId);
@@ -240,15 +231,7 @@ class MurajaahController extends Controller
         $query = Murajaah::query()
             ->with(['student.classRoom', 'teacher', 'academicYear', 'surah']);
 
-        if ($request->user()->isTeacher()) {
-            $teacherId = $request->user()->teacher?->id;
-            $query->whereHas('student', function ($student) use ($teacherId) {
-                $student->where(function ($q) use ($teacherId) {
-                    $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
-                        ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
-                });
-            });
-        }
+        SupervisedStudentScope::apply($query, $request->user(), viaRelation: true);
 
         if ($studentId = $request->integer('student_id')) {
             $query->where('student_id', $studentId);
@@ -347,7 +330,7 @@ class MurajaahController extends Controller
         ])->all();
 
         $format = $this->resolveExportFormat($request->query('format'));
-        $filename = 'export_murajaah_' . now()->format('Ymd_His') . ($format === 'xlsx' ? '.xlsx' : '.csv');
+        $filename = 'export_murajaah_'.now()->format('Ymd_His').($format === 'xlsx' ? '.xlsx' : '.csv');
 
         return $format === 'xlsx'
             ? $this->xlsxDownload($filename, $headers, $rows)
@@ -393,7 +376,7 @@ class MurajaahController extends Controller
         $value = (string) ($value ?? '');
 
         if ($value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
-            return "'" . $value;
+            return "'".$value;
         }
 
         return $value;
@@ -419,11 +402,11 @@ class MurajaahController extends Controller
 
     private function xlsxDownload(string $filename, array $headers, array $rows): BinaryFileResponse
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
 
         $sheet->fromArray($headers, null, 'A1');
-        $sheet->getStyle('A1:' . $sheet->getHighestDataColumn() . '1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:'.$sheet->getHighestDataColumn().'1')->getFont()->setBold(true);
 
         if ($rows !== []) {
             $sheet->fromArray($rows, null, 'A2');

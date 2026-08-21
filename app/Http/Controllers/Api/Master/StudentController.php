@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\Master;
 use App\Domain\Academic\Models\AcademicYear;
 use App\Domain\Academic\Models\ClassRoom;
 use App\Domain\People\Models\Student;
+use App\Domain\People\Support\SupervisedStudentScope;
+use App\Domain\Tahfidz\Services\ProgressService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Master\StoreStudentRequest;
 use App\Http\Requests\Master\UploadStudentPhotoRequest;
@@ -23,6 +25,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StudentController extends Controller
 {
+    public function __construct(
+        private readonly ProgressService $progressService,
+    ) {}
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', Student::class);
@@ -34,13 +40,7 @@ class StudentController extends Controller
 
         // Guru hanya melihat siswa binaannya: murid kelas yang ia wali (homeroom)
         // ATAU murid yang tergabung dalam kelompok tahfidz binaannya.
-        if ($request->user()->isTeacher()) {
-            $teacherId = $request->user()->teacher?->id;
-            $query->where(function ($q) use ($teacherId) {
-                $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
-                    ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
-            });
-        }
+        SupervisedStudentScope::apply($query, $request->user());
 
         if ($classId = $request->integer('class_id') ?: $request->integer('kelas_id')) {
             $query->where('class_id', $classId);
@@ -103,6 +103,13 @@ class StudentController extends Controller
 
         $student->update($request->validated());
 
+        // progress_percentage relatif terhadap target & juz awal — ringkasan
+        // harus dihitung ulang bila keduanya berubah (endpoint GET tidak
+        // melakukan recompute lagi).
+        if ($student->wasChanged(['memorization_target', 'starting_juz'])) {
+            $this->progressService->recompute($student);
+        }
+
         return response()->json($student);
     }
 
@@ -110,7 +117,19 @@ class StudentController extends Controller
     {
         $this->authorize('delete', $student);
 
-        $student->delete();
+        DB::transaction(function () use ($student) {
+            // Ambil akun login sebelum record dihapus agar relasinya tetap bisa dibaca.
+            $user = $student->user;
+
+            $student->delete();
+
+            // Akun tanpa data santri tidak boleh tetap bisa login:
+            // nonaktifkan akun dan cabut seluruh token Sanctum miliknya.
+            if ($user) {
+                $user->forceFill(['is_active' => false])->save();
+                $user->tokens()->delete();
+            }
+        });
 
         return response()->json(['message' => 'Siswa berhasil dihapus.']);
     }
@@ -189,13 +208,7 @@ class StudentController extends Controller
 
         $query = Student::query()->with(['classRoom', 'academicYear']);
 
-        if ($request->user()->isTeacher()) {
-            $teacherId = $request->user()->teacher?->id;
-            $query->where(function ($q) use ($teacherId) {
-                $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
-                    ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
-            });
-        }
+        SupervisedStudentScope::apply($query, $request->user());
         if ($classId = $request->integer('class_id') ?: $request->integer('kelas_id')) {
             $query->where('class_id', $classId);
         }
@@ -251,7 +264,7 @@ class StudentController extends Controller
         ])->all();
 
         $format = $this->resolveExportFormat($request->query('format'));
-        $filename = 'export_santri_' . now()->format('Ymd_His') . ($format === 'xlsx' ? '.xlsx' : '.csv');
+        $filename = 'export_santri_'.now()->format('Ymd_His').($format === 'xlsx' ? '.xlsx' : '.csv');
 
         return $format === 'xlsx'
             ? $this->xlsxDownload($filename, $headers, $rows)
@@ -270,7 +283,7 @@ class StudentController extends Controller
         try {
             [$headerRow, $dataRows] = $this->readRowsFromFile($file);
         } catch (\Throwable $e) {
-            return response()->json(['message' => 'Gagal membaca file: ' . $e->getMessage()], 422);
+            return response()->json(['message' => 'Gagal membaca file: '.$e->getMessage()], 422);
         }
 
         if (empty($headerRow)) {
@@ -278,9 +291,9 @@ class StudentController extends Controller
         }
 
         $headerRow = array_map(fn ($h) => strtolower(trim((string) $h)), $headerRow);
-        $missing   = array_diff(['student_code','name','gender','class_id','academic_year_id'], $headerRow);
+        $missing = array_diff(['student_code', 'name', 'gender', 'class_id', 'academic_year_id'], $headerRow);
         if ($missing) {
-            return response()->json(['message' => 'Kolom wajib tidak ditemukan: ' . implode(', ', $missing)], 422);
+            return response()->json(['message' => 'Kolom wajib tidak ditemukan: '.implode(', ', $missing)], 422);
         }
 
         // Mode import: 'update' = tambah baru + perbarui yang sudah ada;
@@ -288,29 +301,38 @@ class StudentController extends Controller
         $mode = strtolower((string) $request->input('mode', 'update'));
         $mode = in_array($mode, ['update', 'insert_only'], true) ? $mode : 'update';
 
-        $classMap        = ClassRoom::pluck('id', 'id')->toArray();
+        $classMap = ClassRoom::pluck('id', 'id')->toArray();
         $academicYearMap = AcademicYear::pluck('id', 'id')->toArray();
         $imported = 0;
-        $skipped  = [];
+        $skipped = [];
+        $dirtyStudentIds = [];
 
         DB::beginTransaction();
         try {
-            $this->processImportRows($headerRow, $dataRows, $classMap, $academicYearMap, $mode, $imported, $skipped);
+            $this->processImportRows($headerRow, $dataRows, $classMap, $academicYearMap, $mode, $imported, $skipped, $dirtyStudentIds);
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
 
-            return response()->json(['message' => 'Terjadi kesalahan: ' . $e->getMessage()], 500);
+            return response()->json(['message' => 'Terjadi kesalahan: '.$e->getMessage()], 500);
+        }
+
+        // Ringkasan progres bersifat denormalisasi: hitung ulang hanya santri
+        // yang target/juz awalnya berubah lewat import (GET tidak recompute).
+        if ($dirtyStudentIds !== []) {
+            Student::whereIn('id', array_unique($dirtyStudentIds))
+                ->get()
+                ->each(fn (Student $student) => $this->progressService->recompute($student));
         }
 
         return response()->json([
-            'message'  => "Import selesai. {$imported} data berhasil diimpor." . (count($skipped) ? ' ' . count($skipped) . ' baris dilewati.' : ''),
+            'message' => "Import selesai. {$imported} data berhasil diimpor.".(count($skipped) ? ' '.count($skipped).' baris dilewati.' : ''),
             'imported' => $imported,
-            'skipped'  => $skipped,
+            'skipped' => $skipped,
         ]);
     }
 
-    private function processImportRows(array $headerRow, array $dataRows, array $classMap, array $academicYearMap, string $mode, int &$imported, array &$skipped): void
+    private function processImportRows(array $headerRow, array $dataRows, array $classMap, array $academicYearMap, string $mode, int &$imported, array &$skipped, array &$dirtyStudentIds): void
     {
         // Baris 1 adalah header, sehingga baris data pertama bernomor 2.
         $rowNum = 1;
@@ -333,32 +355,35 @@ class StudentController extends Controller
             }
 
             $validator = Validator::make($data, [
-                'student_code'        => ['required', 'string', 'max:30'],
-                'name'                => ['required', 'string', 'max:150'],
-                'gender'              => ['required', Rule::in(['L', 'P'])],
-                'class_id'            => ['required', 'integer'],
-                'academic_year_id'    => ['required', 'integer'],
-                'birth_date'          => ['nullable', 'date'],
-                'entry_year'          => ['nullable', 'integer', 'min:2000', 'max:2100'],
-                'status'              => ['nullable', Rule::in(['active', 'inactive', 'graduated', 'transferred'])],
+                'student_code' => ['required', 'string', 'max:30'],
+                'name' => ['required', 'string', 'max:150'],
+                'gender' => ['required', Rule::in(['L', 'P'])],
+                'class_id' => ['required', 'integer'],
+                'academic_year_id' => ['required', 'integer'],
+                'birth_date' => ['nullable', 'date'],
+                'entry_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+                'status' => ['nullable', Rule::in(['active', 'inactive', 'graduated', 'transferred'])],
                 'memorization_target' => ['nullable', 'integer', 'min:1', 'max:30'],
-                'starting_juz'        => ['nullable', 'integer', 'min:1', 'max:30'],
+                'starting_juz' => ['nullable', 'integer', 'min:1', 'max:30'],
             ]);
 
             if ($validator->fails()) {
                 $skipped[] = ['row' => $rowNum, 'data' => $data['student_code'] ?? "(baris {$rowNum})", 'errors' => $validator->errors()->all()];
+
                 continue;
             }
 
             $classId = (int) $data['class_id'];
-            $yearId  = (int) $data['academic_year_id'];
+            $yearId = (int) $data['academic_year_id'];
 
-            if (!isset($classMap[$classId])) {
+            if (! isset($classMap[$classId])) {
                 $skipped[] = ['row' => $rowNum, 'data' => $data['student_code'], 'errors' => ["class_id {$classId} tidak ditemukan."]];
+
                 continue;
             }
-            if (!isset($academicYearMap[$yearId])) {
+            if (! isset($academicYearMap[$yearId])) {
                 $skipped[] = ['row' => $rowNum, 'data' => $data['student_code'], 'errors' => ["academic_year_id {$yearId} tidak ditemukan."]];
+
                 continue;
             }
 
@@ -366,6 +391,7 @@ class StudentController extends Controller
 
             if ($existing && $mode === 'insert_only') {
                 $skipped[] = ['row' => $rowNum, 'data' => $data['student_code'], 'errors' => ['student_code sudah ada (mode insert only).']];
+
                 continue;
             }
 
@@ -375,27 +401,27 @@ class StudentController extends Controller
             // ikut disimpan saat update). Gunakan ?? null agar CSV parsial
             // tidak memicu error "undefined array key".
             $values = array_filter([
-                'student_code'        => $data['student_code'] ?? null,
-                'name'                => $data['name'] ?? null,
-                'gender'              => $data['gender'] ?? null,
-                'nis'                 => $data['nis'] ?? null,
-                'nisn'                => $data['nisn'] ?? null,
-                'nik'                 => $data['nik'] ?? null,
-                'birth_place'         => $data['birth_place'] ?? null,
-                'birth_date'          => $data['birth_date'] ?? null,
-                'address'             => $data['address'] ?? null,
-                'phone'               => $data['phone'] ?? null,
-                'class_id'            => $classId,
-                'academic_year_id'    => $yearId,
-                'entry_year'          => $data['entry_year'] ?? null,
-                'father_name'         => $data['father_name'] ?? null,
-                'mother_name'         => $data['mother_name'] ?? null,
-                'guardian_name'       => $data['guardian_name'] ?? null,
-                'guardian_phone'      => $data['guardian_phone'] ?? null,
-                'guardian_address'    => $data['guardian_address'] ?? null,
+                'student_code' => $data['student_code'] ?? null,
+                'name' => $data['name'] ?? null,
+                'gender' => $data['gender'] ?? null,
+                'nis' => $data['nis'] ?? null,
+                'nisn' => $data['nisn'] ?? null,
+                'nik' => $data['nik'] ?? null,
+                'birth_place' => $data['birth_place'] ?? null,
+                'birth_date' => $data['birth_date'] ?? null,
+                'address' => $data['address'] ?? null,
+                'phone' => $data['phone'] ?? null,
+                'class_id' => $classId,
+                'academic_year_id' => $yearId,
+                'entry_year' => $data['entry_year'] ?? null,
+                'father_name' => $data['father_name'] ?? null,
+                'mother_name' => $data['mother_name'] ?? null,
+                'guardian_name' => $data['guardian_name'] ?? null,
+                'guardian_phone' => $data['guardian_phone'] ?? null,
+                'guardian_address' => $data['guardian_address'] ?? null,
                 'memorization_target' => ($data['memorization_target'] ?? null) !== null ? (int) $data['memorization_target'] : null,
-                'starting_juz'        => ($data['starting_juz'] ?? null) !== null ? (int) $data['starting_juz'] : null,
-                'notes'               => $data['notes'] ?? null,
+                'starting_juz' => ($data['starting_juz'] ?? null) !== null ? (int) $data['starting_juz'] : null,
+                'notes' => $data['notes'] ?? null,
             ], fn ($v) => $v !== null);
 
             if ($existing) {
@@ -406,6 +432,11 @@ class StudentController extends Controller
                 }
 
                 $existing->update($values);
+
+                // Tandai untuk recompute ringkasan bila target/juz awal berubah.
+                if ($existing->wasChanged(['memorization_target', 'starting_juz'])) {
+                    $dirtyStudentIds[] = $existing->id;
+                }
             } else {
                 $values['status'] = $data['status'] ?? 'active';
 
@@ -487,7 +518,7 @@ class StudentController extends Controller
 
         // CSV / TXT — tangani BOM UTF-8 bila ada.
         $handle = fopen($file->getRealPath(), 'r');
-        $bom    = fread($handle, 3);
+        $bom = fread($handle, 3);
         if ($bom !== "\xEF\xBB\xBF") {
             rewind($handle);
         }
@@ -523,7 +554,7 @@ class StudentController extends Controller
         $value = (string) ($value ?? '');
 
         if ($value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
-            return "'" . $value;
+            return "'".$value;
         }
 
         return $value;
@@ -549,11 +580,11 @@ class StudentController extends Controller
 
     private function xlsxDownload(string $filename, array $headers, array $rows): BinaryFileResponse
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
 
         $sheet->fromArray($headers, null, 'A1');
-        $sheet->getStyle('A1:' . $sheet->getHighestDataColumn() . '1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:'.$sheet->getHighestDataColumn().'1')->getFont()->setBold(true);
 
         if ($rows !== []) {
             $sheet->fromArray($rows, null, 'A2');

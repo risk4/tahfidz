@@ -16,7 +16,13 @@ class TahfidzGroupController extends Controller
         $query = TahfidzGroup::query()->with('teacher')->withCount('members');
 
         if ($request->user()->isTeacher()) {
-            $query->where('teacher_id', $request->user()->teacher?->id);
+            $teacherId = $request->user()->teacher?->id;
+
+            // Guru tanpa profil Teacher tidak membina halaqah apa pun —
+            // jangan sampai where(..., null) menjadi whereNull('teacher_id')
+            // yang menampilkan halaqah tanpa pembimbing.
+            $query->when($teacherId !== null, fn ($q) => $q->where('teacher_id', $teacherId))
+                ->when($teacherId === null, fn ($q) => $q->whereRaw('1 = 0'));
         }
 
         return $query->paginate(min(max($request->integer('per_page', 20), 5), 100));

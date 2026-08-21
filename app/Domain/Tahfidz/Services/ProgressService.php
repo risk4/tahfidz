@@ -8,6 +8,7 @@ use App\Domain\Quran\Models\QuranAyah;
 use App\Domain\Tahfidz\Models\StudentAyahCoverage;
 use App\Domain\Tahfidz\Models\StudentProgressSummary;
 use App\Domain\Tahfidz\Models\Submission;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -19,9 +20,7 @@ use Illuminate\Support\Facades\DB;
  */
 class ProgressService
 {
-    public function __construct(private readonly NotificationService $notifications)
-    {
-    }
+    public function __construct(private readonly NotificationService $notifications) {}
 
     /**
      * Hitung ulang & simpan ringkasan progres untuk satu siswa.
@@ -67,12 +66,13 @@ class ProgressService
                 ->whereIn('quran_juz.juz_number', $targetJuzNumbers)
                 ->get(['quran_ayahs.surah_id', 'quran_ayahs.ayah_number']);
 
-            $coveredBySurah = $covered->map(fn ($ayahs) => $ayahs->map(fn ($n) => (int) $n));
+            // Set [surah_id => [ayah_number => true]] untuk lookup O(1).
+            $coveredSets = $this->toCoveredSets($covered);
 
             $targetTotal = $targetAyahs->count();
-            $targetCovered = $targetAyahs->filter(function ($ayah) use ($coveredBySurah) {
-                return $coveredBySurah->get($ayah->surah_id)?->contains((int) $ayah->ayah_number) ?? false;
-            })->count();
+            $targetCovered = $targetAyahs
+                ->filter(fn ($ayah) => isset($coveredSets[$ayah->surah_id][$ayah->ayah_number]))
+                ->count();
 
             $progress = $targetTotal > 0 ? round(($targetCovered / $targetTotal) * 100, 2) : 0;
         } else {
@@ -103,7 +103,7 @@ class ProgressService
     /**
      * Jumlah surah yang seluruh ayatnya sudah tercakup siswa.
      *
-     * @param \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int,int>> $covered
+     * @param  Collection<int, Collection<int,int>>  $covered
      */
     private function countCompletedSurahs($covered): int
     {
@@ -126,7 +126,7 @@ class ProgressService
     /**
      * Jumlah juz yang seluruh ayatnya sudah tercakup siswa.
      *
-     * @param \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int,int>> $covered
+     * @param  Collection<int, Collection<int,int>>  $covered
      */
     private function countCompletedJuz($covered): int
     {
@@ -137,13 +137,15 @@ class ProgressService
             ->get()
             ->groupBy('juz_id');
 
-        $coveredBySurah = $covered->map(fn ($ayahs) => $ayahs->map(fn ($n) => (int) $n));
+        // Set [surah_id => [ayah_number => true]] agar pengecekan tiap ayat
+        // O(1) alih-alih linear scan (`contains`) pada koleksi besar.
+        $coveredSets = $this->toCoveredSets($covered);
 
         $completed = 0;
 
         foreach ($ayahs as $juzAyahs) {
-            $allCovered = $juzAyahs->every(function ($ayah) use ($coveredBySurah) {
-                return $coveredBySurah->get($ayah->surah_id)?->contains((int) $ayah->ayah_number) ?? false;
+            $allCovered = $juzAyahs->every(function ($ayah) use ($coveredSets) {
+                return isset($coveredSets[$ayah->surah_id][$ayah->ayah_number]);
             });
 
             if ($allCovered) {
@@ -153,5 +155,18 @@ class ProgressService
 
         return $completed;
     }
-}
 
+    /**
+     * Ubah peta [surah_id => Collection<ayah_number>] menjadi
+     * [surah_id => [ayah_number => true]] untuk lookup konstan.
+     *
+     * @param  Collection<int, Collection<int,int>>  $covered
+     * @return array<int, array<int, bool>>
+     */
+    private function toCoveredSets($covered): array
+    {
+        return $covered
+            ->map(fn ($ayahNumbers) => $ayahNumbers->map(fn ($n) => (int) $n)->flip()->all())
+            ->all();
+    }
+}

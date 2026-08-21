@@ -17,8 +17,7 @@ class SubmissionService
     public function __construct(
         private readonly ProgressService $progressService,
         private readonly NotificationService $notifications,
-    ) {
-    }
+    ) {}
 
     /**
      * final_score adalah rata-rata dari 4 sub-skor (masing-masing 0-100).
@@ -97,25 +96,76 @@ class SubmissionService
      * submission pertama yang mencakup ayat tersebut yang dicatat sebagai
      * first_covered_submission_id. Atribusi tidak ditimpa oleh submission
      * berikutnya yang mencakup ayat yang sama.
+     *
+     * Implementasi batch: satu SELECT untuk membaca kondisi awal, lalu
+     * maksimal tiga operasi tulis (INSERT massal untuk ayat baru, UPDATE
+     * adopsi untuk baris warisan murajaah, UPDATE status untuk baris milik
+     * submission lain) — bukan query per-ayat.
      */
     private function syncCoverage(Submission $submission): void
     {
-        for ($ayah = $submission->start_ayah; $ayah <= $submission->end_ayah; $ayah++) {
-            $coverage = StudentAyahCoverage::firstOrNew([
+        $ayahs = range($submission->start_ayah, $submission->end_ayah);
+
+        $existing = StudentAyahCoverage::query()
+            ->where('student_id', $submission->student_id)
+            ->where('surah_id', $submission->surah_id)
+            ->whereIn('ayah_number', $ayahs)
+            ->get()
+            ->keyBy('ayah_number');
+
+        $missing = [];
+        $orphanAyahs = []; // ada barisnya, tapi belum dimiliki submission mana pun
+        $ownedAyahs = [];  // sudah dimiliki submission lain — atribusi dipertahankan
+
+        foreach ($ayahs as $ayah) {
+            $row = $existing->get($ayah);
+
+            if ($row === null) {
+                $missing[] = $ayah;
+            } elseif ($row->first_covered_submission_id === null) {
+                $orphanAyahs[] = $ayah;
+            } else {
+                $ownedAyahs[] = $ayah;
+            }
+        }
+
+        $now = now();
+
+        if ($missing !== []) {
+            StudentAyahCoverage::insert(array_map(fn ($ayah) => [
                 'student_id' => $submission->student_id,
                 'surah_id' => $submission->surah_id,
                 'ayah_number' => $ayah,
-            ]);
+                'memorization_status' => StudentAyahCoverage::STATUS_MEMORIZED,
+                'first_covered_submission_id' => $submission->id,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], $missing));
+        }
 
-            $coverage->memorization_status = StudentAyahCoverage::STATUS_MEMORIZED;
+        // Baris warisan murajaah (owner NULL) diadopsi submission ini.
+        if ($orphanAyahs !== []) {
+            StudentAyahCoverage::query()
+                ->where('student_id', $submission->student_id)
+                ->where('surah_id', $submission->surah_id)
+                ->whereIn('ayah_number', $orphanAyahs)
+                ->update([
+                    'memorization_status' => StudentAyahCoverage::STATUS_MEMORIZED,
+                    'first_covered_submission_id' => $submission->id,
+                    'updated_at' => $now,
+                ]);
+        }
 
-            // Baris yang sudah dimiliki submission lain tidak ditimpa.
-            // Baris baru atau baris milik murajaah (NULL) diadopsi submission ini.
-            if (! $coverage->exists || $coverage->first_covered_submission_id === null) {
-                $coverage->first_covered_submission_id = $submission->id;
-            }
-
-            $coverage->save();
+        // Baris milik submission lain: cukup pastikan berstatus memorized.
+        if ($ownedAyahs !== []) {
+            StudentAyahCoverage::query()
+                ->where('student_id', $submission->student_id)
+                ->where('surah_id', $submission->surah_id)
+                ->whereIn('ayah_number', $ownedAyahs)
+                ->update([
+                    'memorization_status' => StudentAyahCoverage::STATUS_MEMORIZED,
+                    'updated_at' => $now,
+                ]);
         }
     }
 
@@ -126,7 +176,9 @@ class SubmissionService
      * Hanya baris milik submission (first_covered_submission_id terisi) yang
      * dihapus & dibangun ulang. Catatan per-ayat dari murajaah
      * (first_covered_submission_id NULL) dipertahankan agar status hafalan
-     * dari murajaah tidak hilang saat submission diubah/dihapus.
+     * dari murajaah tidak hilang saat submission diubah/dihapus — bila
+     * ayatnya kini dicakup submission, baris tersebut diadopsi alih-alih
+     * dibuat ulang.
      */
     private function rebuildCoverage(Student $student): void
     {
@@ -140,24 +192,66 @@ class SubmissionService
             ->get(['id', 'surah_id', 'start_ayah', 'end_ayah']);
 
         // Submission diproses dari yang paling awal, sehingga submission pertama
-        // yang mencakup sebuah ayat yang mencatat first_covered_submission_id;
+        // yang mencakup sebuah ayat yang mencatat atribusi (prinsip first-wins);
         // submission berikutnya tidak menimpa atribusi tersebut.
+        $attributed = [];
         foreach ($submissions as $submission) {
             for ($ayah = $submission->start_ayah; $ayah <= $submission->end_ayah; $ayah++) {
-                $coverage = StudentAyahCoverage::firstOrNew([
-                    'student_id' => $student->id,
-                    'surah_id' => $submission->surah_id,
-                    'ayah_number' => $ayah,
-                ]);
-
-                $coverage->memorization_status = StudentAyahCoverage::STATUS_MEMORIZED;
-
-                if (! $coverage->exists || $coverage->first_covered_submission_id === null) {
-                    $coverage->first_covered_submission_id = $submission->id;
-                }
-
-                $coverage->save();
+                $attributed[$submission->surah_id][$ayah] ??= $submission->id;
             }
+        }
+
+        if ($attributed === []) {
+            return;
+        }
+
+        // Baris warisan murajaah yang selamat dari delete di atas dan kini
+        // dicakup oleh submission harus DIADOPSI (bukan insert ulang —
+        // constraint uniq_student_ayah akan melarang duplikat).
+        $orphanKeys = StudentAyahCoverage::where('student_id', $student->id)
+            ->whereNull('first_covered_submission_id')
+            ->get(['surah_id', 'ayah_number'])
+            ->mapWithKeys(fn ($row) => [$row->surah_id.'-'.$row->ayah_number => true])
+            ->all();
+
+        $adoptions = []; // [surah_id][submission_id][] = daftar ayat yang diadopsi
+        $toInsert = [];
+        $now = now();
+
+        foreach ($attributed as $surahId => $owners) {
+            foreach ($owners as $ayah => $submissionId) {
+                if (isset($orphanKeys[$surahId.'-'.$ayah])) {
+                    $adoptions[$surahId][$submissionId][] = $ayah;
+                } else {
+                    $toInsert[] = [
+                        'student_id' => $student->id,
+                        'surah_id' => $surahId,
+                        'ayah_number' => $ayah,
+                        'memorization_status' => StudentAyahCoverage::STATUS_MEMORIZED,
+                        'first_covered_submission_id' => $submissionId,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+            }
+        }
+
+        foreach ($adoptions as $surahId => $bySubmission) {
+            foreach ($bySubmission as $submissionId => $ayahs) {
+                StudentAyahCoverage::query()
+                    ->where('student_id', $student->id)
+                    ->where('surah_id', $surahId)
+                    ->whereIn('ayah_number', $ayahs)
+                    ->update([
+                        'memorization_status' => StudentAyahCoverage::STATUS_MEMORIZED,
+                        'first_covered_submission_id' => $submissionId,
+                        'updated_at' => $now,
+                    ]);
+            }
+        }
+
+        foreach (array_chunk($toInsert, 500) as $chunk) {
+            StudentAyahCoverage::insert($chunk);
         }
     }
 }

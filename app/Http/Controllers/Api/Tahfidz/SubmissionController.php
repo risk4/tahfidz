@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Tahfidz;
 
 use App\Domain\Academic\Models\AcademicYear;
 use App\Domain\People\Models\Teacher;
+use App\Domain\People\Support\SupervisedStudentScope;
 use App\Domain\Quran\Models\QuranSurah;
 use App\Domain\Tahfidz\Models\Submission;
 use App\Domain\Tahfidz\Services\SubmissionService;
@@ -21,8 +22,7 @@ class SubmissionController extends Controller
 {
     public function __construct(
         private readonly SubmissionService $submissionService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -33,15 +33,7 @@ class SubmissionController extends Controller
 
         // Guru hanya melihat submission siswa binaannya: murid kelas yang ia wali
         // (homeroom) ATAU murid dalam kelompok tahfidz binaannya.
-        if ($request->user()->isTeacher()) {
-            $teacherId = $request->user()->teacher?->id;
-            $query->whereHas('student', function ($student) use ($teacherId) {
-                $student->where(function ($q) use ($teacherId) {
-                    $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
-                        ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
-                });
-            });
-        }
+        SupervisedStudentScope::apply($query, $request->user(), viaRelation: true);
 
         if ($studentId = $request->integer('student_id')) {
             $query->where('student_id', $studentId);
@@ -194,15 +186,7 @@ class SubmissionController extends Controller
         $query = Submission::query()
             ->with(['student.classRoom', 'teacher', 'academicYear', 'surah']);
 
-        if ($request->user()->isTeacher()) {
-            $teacherId = $request->user()->teacher?->id;
-            $query->whereHas('student', function ($student) use ($teacherId) {
-                $student->where(function ($q) use ($teacherId) {
-                    $q->whereHas('classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId))
-                        ->orWhereHas('tahfidzGroups', fn ($group) => $group->where('teacher_id', $teacherId));
-                });
-            });
-        }
+        SupervisedStudentScope::apply($query, $request->user(), viaRelation: true);
 
         if ($studentId = $request->integer('student_id')) {
             $query->where('student_id', $studentId);
@@ -289,7 +273,7 @@ class SubmissionController extends Controller
         ])->all();
 
         $format = $this->resolveExportFormat($request->query('format'));
-        $filename = 'export_setoran_' . now()->format('Ymd_His') . ($format === 'xlsx' ? '.xlsx' : '.csv');
+        $filename = 'export_setoran_'.now()->format('Ymd_His').($format === 'xlsx' ? '.xlsx' : '.csv');
 
         return $format === 'xlsx'
             ? $this->xlsxDownload($filename, $headers, $rows)
@@ -348,7 +332,7 @@ class SubmissionController extends Controller
         $value = (string) ($value ?? '');
 
         if ($value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
-            return "'" . $value;
+            return "'".$value;
         }
 
         return $value;
@@ -374,11 +358,11 @@ class SubmissionController extends Controller
 
     private function xlsxDownload(string $filename, array $headers, array $rows): BinaryFileResponse
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
 
         $sheet->fromArray($headers, null, 'A1');
-        $sheet->getStyle('A1:' . $sheet->getHighestDataColumn() . '1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:'.$sheet->getHighestDataColumn().'1')->getFont()->setBold(true);
 
         if ($rows !== []) {
             $sheet->fromArray($rows, null, 'A2');
