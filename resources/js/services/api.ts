@@ -820,13 +820,34 @@ export const settingsService = {
  * sebelum user masuk, sehingga tidak ada guard token yang bisa
  * menyebabkan logo "muncul sebentar lalu hilang".
  */
+
+const BRANDING_CACHE_KEY = 'app_branding_cache';
+
+export type BrandingData = { app_name: string | null; logo_path: string | null };
+
+/** Baca cache branding dari localStorage (null jika belum ada / rusak). */
+export function getBrandingCache(): BrandingData | null {
+  try {
+    const raw = localStorage.getItem(BRANDING_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as BrandingData;
+  } catch {
+    return null;
+  }
+}
+
 export const brandingService = {
-  async get(): Promise<{ app_name: string | null; logo_path: string | null }> {
+  async get(): Promise<BrandingData> {
     // Gunakan axios biasa (bukan instance `api`) agar interceptor 401
     // tidak memicu redirect ke /login saat request ini gagal.
-    const response = await axios.get<{ app_name: string | null; logo_path: string | null }>(
-      '/api/branding',
-    );
-    return response.data;
+    const response = await axios.get<BrandingData>('/api/branding');
+    const data = response.data;
+    // Simpan ke localStorage agar tersedia setelah hard refresh.
+    try {
+      localStorage.setItem(BRANDING_CACHE_KEY, JSON.stringify(data));
+    } catch {
+      // localStorage penuh / mode private — abaikan saja.
+    }
+    return data;
   },
 };

@@ -1,7 +1,7 @@
 import { BookOpen, ChartNoAxesCombined, ShieldCheck, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { LoginFeature } from '@/components/auth/LoginFeature';
-import { brandingService } from '@/services/api';
+import { brandingService, getBrandingCache } from '@/services/api';
 
 const features = [
   { icon: Users, title: 'Kelola santri dengan mudah', description: 'Data santri, kelas, dan pembimbing terorganisir.' },
@@ -12,13 +12,15 @@ const features = [
 
 export function LoginBrandPanel() {
   // Gunakan endpoint publik /api/branding — tidak memerlukan token.
-  // Dengan begitu logo & nama app selalu tampil di halaman login
-  // tanpa bergantung pada status autentikasi user.
+  // initialData dari localStorage → logo langsung tampil saat hard refresh
+  // tanpa menunggu fetch selesai. Setiap fetch berhasil, localStorage
+  // diperbarui oleh brandingService.get() sehingga nilai selalu fresh.
   const { data: branding } = useQuery({
     queryKey: ['branding'],
     queryFn: () => brandingService.get(),
+    initialData: getBrandingCache() ?? undefined,
     staleTime: 5 * 60 * 1000, // 5 menit — jarang berubah
-    gcTime: 30 * 60 * 1000,   // simpan cache 30 menit agar tetap ada saat logout lalu kembali ke /login
+    gcTime: 30 * 60 * 1000,   // simpan cache React Query 30 menit di memori
     retry: 1,
   });
   const logoUrl = branding?.logo_path ? `/storage/${branding.logo_path}` : null;
