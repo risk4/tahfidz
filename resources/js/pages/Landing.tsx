@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { brandingService, getBrandingCache } from "@/services/api";
 import {
   Moon,
   Users,
@@ -139,18 +141,43 @@ const footerHelp = [
 /* -------------------------------------------------------------------------- */
 
 function Logo({ dark = false }) {
+  const { data: branding } = useQuery({
+    queryKey: ["branding"],
+    queryFn: () => brandingService.get(),
+    initialData: getBrandingCache() ?? undefined,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
+  });
+  const logoUrl = branding?.logo_path ? `/storage/${branding.logo_path}` : null;
+  const appName = branding?.app_name ?? null;
+
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600">
-        <Moon className="h-5 w-5 text-white" strokeWidth={2.5} fill="white" />
-      </div>
+      {logoUrl ? (
+        <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-emerald-600 ring-1 ring-emerald-700/20">
+          <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
+        </div>
+      ) : (
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600">
+          <Moon className="h-5 w-5 text-white" strokeWidth={2.5} fill="white" />
+        </div>
+      )}
       <div className="leading-tight">
-        <p className={`text-[15px] font-bold ${dark ? "text-white" : "text-slate-900"}`}>
-          Tahfidz
-        </p>
-        <p className={`-mt-0.5 text-[15px] font-bold ${dark ? "text-white" : "text-slate-900"}`}>
-          Qur'an
-        </p>
+        {appName ? (
+          <p className={`max-w-[160px] truncate text-[15px] font-bold ${dark ? "text-white" : "text-slate-900"}`}>
+            {appName}
+          </p>
+        ) : (
+          <>
+            <p className={`text-[15px] font-bold ${dark ? "text-white" : "text-slate-900"}`}>
+              Tahfidz
+            </p>
+            <p className={`-mt-0.5 text-[15px] font-bold ${dark ? "text-white" : "text-slate-900"}`}>
+              Qur'an
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
