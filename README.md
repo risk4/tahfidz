@@ -284,8 +284,8 @@ APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://domain-anda.com
 
-# Opsional: tetap gunakan password seeder yang sama
-# SEED_USER_PASSWORD=GANTI_PRINT_KE_KONSOLE_ATAU_KOSONGKAN
+# Opsional: jika diisi, password ini dipakai untuk ketiga akun seeder
+# SEED_USER_PASSWORD=pass123
 
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
@@ -295,7 +295,7 @@ DB_USERNAME=USER_DATABASE
 DB_PASSWORD=PASSWORD_DATABASE
 ```
 
-> **Tips password seeder:** jika `SEED_USER_PASSWORD` dibiarkan kosong, setiap akun seeder akan diberi password acak dan dicetak ke console saat seeding. Jika diisi, password tersebut yang dipakai untuk ketiga akun seeder — sebaiknya diubah setelah login pertama.
+> **Tips password seeder:** secara default, ketiga akun seeder memakai password **`password`**. Jika `SEED_USER_PASSWORD` diisi di `.env`, nilai tersebut yang dipakai menggantikan default — sebaiknya diubah setelah login pertama.
 
 ### 6. Jalankan migration dan seeder
 
@@ -390,7 +390,7 @@ sudo crontab -e
 
 ### 11. Verify
 
-Akses `https://domain-anda.com`. Login menggunakan akun seeder (lihat bagian **Akun Seeder** di bawah). Jika `SEED_USER_PASSWORD` kosong, password acak dicetak saat seeding dan tidak ditampilkan lagi.
+Akses `https://domain-anda.com`. Login menggunakan akun seeder (lihat bagian **Akun Seeder** di bawah). Password default untuk semua akun seeder adalah **`password`** (bisa dioverride via `SEED_USER_PASSWORD` di `.env`).
 
 Gunakan menu **Website → Monitoring / Error log** di aaPanel jika terjadi kendala, atau cek log aplikasi di `storage/logs/laravel.log`.
 
@@ -406,11 +406,11 @@ Setelah menjalankan seeder, tersedia akun awal berikut:
 | Guru | guru1@example.com |
 | Siswa | siswa1@example.com |
 
-Password setiap akun **dibuat acak saat seeding** dan dicetak ke console (baris diawali `Akun seeder dibuat dengan password acak...`). Simpan catatan password tersebut karena tidak akan ditampilkan lagi.
+Password default setiap akun adalah **`password`** (untuk development/production yang ingin password berbeda, set variabel env `SEED_USER_PASSWORD`, mis. `SEED_USER_PASSWORD=pass123`).
 
 Semua akun seeder ditandai `must_change_password` — pada login pertama, aplikasi akan mewajibkan pengguna mengganti password sebelum bisa mengakses fitur lain.
 
-Untuk development lokal yang ingin password tetap, set variabel env `SEED_USER_PASSWORD` (mis. `SEED_USER_PASSWORD=password`) lalu jalankan `php artisan migrate:fresh --seed`.
+Untuk development lokal yang ingin password seeder ditentukan sendiri, set variabel env `SEED_USER_PASSWORD` (mis. `SEED_USER_PASSWORD=pass123`) lalu jalankan `php artisan migrate:fresh --seed`.
 
 ## Struktur Menu
 
