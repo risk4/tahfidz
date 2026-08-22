@@ -1,7 +1,8 @@
+import { useEffect } from 'react';
 import { BookOpen, ChartNoAxesCombined, ShieldCheck, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { LoginFeature } from '@/components/auth/LoginFeature';
-import { brandingService, getBrandingCache } from '@/services/api';
+import { brandingService, getBrandingCache, applyFavicon } from '@/services/api';
 
 const features = [
   { icon: Users, title: 'Kelola santri dengan mudah', description: 'Data santri, kelas, dan pembimbing terorganisir.' },
@@ -25,6 +26,15 @@ export function LoginBrandPanel() {
   });
   const logoUrl = branding?.logo_path ? `/storage/${branding.logo_path}` : null;
   const appName = branding?.app_name ?? null;
+
+  useEffect(() => {
+    if (branding?.favicon_path) {
+      applyFavicon(branding.favicon_path);
+    }
+    if (branding?.app_name) {
+      document.title = branding.app_name;
+    }
+  }, [branding]);
 
   return (
     <aside className="relative hidden overflow-hidden bg-gradient-to-br from-[#075B30] to-[#0D753F] text-white md:flex">

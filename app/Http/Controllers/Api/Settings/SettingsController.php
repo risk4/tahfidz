@@ -49,8 +49,9 @@ class SettingsController extends Controller
         $application = $this->settings->group('application');
 
         return response()->json([
-            'app_name' => $application['app_name'] ?? $profile['name'] ?? null,
-            'logo_path' => $application['logo_path'] ?? $profile['logo_path'] ?? null,
+            'app_name'     => $application['app_name'] ?? $profile['name'] ?? null,
+            'logo_path'    => $application['logo_path'] ?? $profile['logo_path'] ?? null,
+            'favicon_path' => $application['favicon_path'] ?? null,
         ]);
     }
 

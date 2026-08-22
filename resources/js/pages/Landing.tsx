@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { brandingService, getBrandingCache } from "@/services/api";
+import { brandingService, getBrandingCache, applyFavicon } from "@/services/api";
 import {
   Moon,
   Users,
@@ -850,6 +850,25 @@ function GoToTop() {
 }
 
 export default function Landing() {
+  // Ambil data branding agar favicon terpasang otomatis dari cache maupun server
+  const { data: branding } = useQuery({
+    queryKey: ["branding"],
+    queryFn: () => brandingService.get(),
+    initialData: getBrandingCache() ?? undefined,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
+  });
+
+  useEffect(() => {
+    if (branding?.favicon_path) {
+      applyFavicon(branding.favicon_path);
+    }
+    if (branding?.app_name) {
+      document.title = branding.app_name;
+    }
+  }, [branding]);
+
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900 antialiased">
       <Navbar />

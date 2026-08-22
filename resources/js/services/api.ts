@@ -823,7 +823,7 @@ export const settingsService = {
 
 const BRANDING_CACHE_KEY = 'app_branding_cache';
 
-export type BrandingData = { app_name: string | null; logo_path: string | null };
+export type BrandingData = { app_name: string | null; logo_path: string | null; favicon_path: string | null };
 
 /** Baca cache branding dari localStorage (null jika belum ada / rusak). */
 export function getBrandingCache(): BrandingData | null {
@@ -834,6 +834,18 @@ export function getBrandingCache(): BrandingData | null {
   } catch {
     return null;
   }
+}
+
+/** Terapkan favicon ke <link rel="icon"> di document.head. */
+export function applyFavicon(faviconPath: string | null): void {
+  if (!faviconPath) return;
+  let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+  }
+  link.href = `/storage/${faviconPath}`;
 }
 
 export const brandingService = {
@@ -848,6 +860,8 @@ export const brandingService = {
     } catch {
       // localStorage penuh / mode private — abaikan saja.
     }
+    // Terapkan favicon segera setelah fetch berhasil.
+    applyFavicon(data.favicon_path);
     return data;
   },
 };
