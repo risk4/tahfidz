@@ -18,6 +18,8 @@ import Murajaah from '@/pages/Murajaah';
 import Quran, { SurahDetail } from '@/pages/Quran';
 import RecitationCheck from '@/pages/RecitationCheck';
 import Progress from '@/pages/Progress';
+import Certificates from '@/pages/Certificates';
+import VerifyCertificate from '@/pages/VerifyCertificate';
 import Settings from '@/pages/Settings';
 import '../css/app.css';
 
@@ -85,6 +87,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      {/* Halaman publik verifikasi keaslian sertifikat (dari QR code). */}
+      <Route path="/sertifikat/verifikasi/:code" element={<VerifyCertificate />} />
       <Route
         path="/login"
         element={
@@ -239,6 +243,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <Progress />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/sertifikat"
+        element={
+          <PrivateRoute>
+            <Certificates />
           </PrivateRoute>
         }
       />

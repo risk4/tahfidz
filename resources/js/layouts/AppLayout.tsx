@@ -14,6 +14,7 @@ import {
   BookMarked,
   BookOpen,
   Mic,
+  Award,
   Settings,
   ChevronDown,
   UserRound,
@@ -91,6 +92,7 @@ const menuItems = [
   { path: '/pengecekan-bacaan', label: 'Pengecekan Bacaan', icon: Mic, roles: ['super_admin', 'teacher', 'student'] },
   { path: '/surah-ayat', label: 'Surat & Ayat', icon: BookOpen, roles: ['super_admin', 'teacher'] },
   { path: '/progress', label: 'Progress', icon: BarChart3, roles: ['super_admin', 'teacher', 'student'] },
+  { path: '/sertifikat', label: 'Sertifikat', icon: Award, roles: ['super_admin', 'teacher', 'student'] },
   { path: '/settings', label: 'Pengaturan', icon: Settings, roles: ['super_admin'] },
 ];
 

@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\Master\ClassRoomController;
 use App\Http\Controllers\Api\Master\StudentController;
 use App\Http\Controllers\Api\Master\TahfidzGroupController;
 use App\Http\Controllers\Api\Quran\QuranController;
+use App\Http\Controllers\Api\Tahfidz\CertificateController;
 use App\Http\Controllers\Api\Tahfidz\MurajaahController;
 use App\Http\Controllers\Api\Tahfidz\ProgressController;
 use App\Http\Controllers\Api\Tahfidz\RecitationCheckController;
@@ -21,6 +22,10 @@ use Illuminate\Support\Facades\Route;
 // Branding info (nama app + logo) untuk halaman login.
 Route::get('/branding', [SettingsController::class, 'branding'])
     ->middleware('throttle:60,1');
+
+// Verifikasi keaslian sertifikat via kode QR (halaman publik).
+Route::get('/certificates/verify/{verificationCode}', [CertificateController::class, 'verify'])
+    ->middleware('throttle:30,1');
 
 // ===== AUTH =====
 Route::post('/auth/login', [AuthController::class, 'login'])
@@ -92,6 +97,11 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::get('/progress/stats', [ProgressController::class, 'stats']);
     Route::get('/progress', [ProgressController::class, 'index']);
     Route::get('/progress/{student}', [ProgressController::class, 'show']);
+
+    // ===== CERTIFICATES — sertifikat capaian hafalan juz =====
+    Route::get('/certificates/stats', [CertificateController::class, 'stats']);
+    Route::get('/certificates/eligible', [CertificateController::class, 'eligible']);
+    Route::apiResource('certificates', CertificateController::class);
 
     // ===== DASHBOARD =====
     Route::get('/dashboard/overview', [DashboardController::class, 'overview']);

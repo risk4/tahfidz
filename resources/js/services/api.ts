@@ -3,8 +3,12 @@ import axios from 'axios';
 import type {
   ActivityLog,
   AppSettings,
+  Certificate,
+  CertificateStats,
+  CertificateVerifyResponse,
   DashboardOverview,
   DashboardRange,
+  EligibleStudent,
   MemorizationStatus,
   NotificationListResponse,
   PaginatedResponse,
@@ -693,6 +697,51 @@ export const dashboardService = {
   async overview(range: DashboardRange = '30d') {
     const response = await api.get('/dashboard/overview', { params: { range } });
     return response.data as DashboardOverview;
+  },
+};
+
+export const certificateService = {
+  async list(params?: { page?: number; per_page?: number; search?: string; class_id?: number; student_id?: number }) {
+    const response = await api.get<PaginatedResponse<Certificate>>('/certificates', { params });
+    return response.data;
+  },
+
+  async stats(): Promise<CertificateStats> {
+    const response = await api.get<CertificateStats>('/certificates/stats');
+    return response.data;
+  },
+
+  async eligible(params?: { search?: string }): Promise<{ data: EligibleStudent[] }> {
+    const response = await api.get('/certificates/eligible', { params });
+    return response.data;
+  },
+
+  async create(data: {
+    student_id: number;
+    juz_count: number;
+    issued_date: string;
+    pembina_name?: string | null;
+    pengajar_name?: string | null;
+    notes?: string | null;
+  }): Promise<{ message: string; certificate: Certificate }> {
+    const response = await api.post('/certificates', data);
+    return response.data;
+  },
+
+  async get(id: number): Promise<{ certificate: Certificate }> {
+    const response = await api.get(`/certificates/${id}`);
+    return response.data;
+  },
+
+  async remove(id: number): Promise<{ message: string }> {
+    const response = await api.delete(`/certificates/${id}`);
+    return response.data;
+  },
+
+  /** Endpoint publik — dipanggil tanpa token (halaman verifikasi QR). */
+  async verify(code: string): Promise<CertificateVerifyResponse> {
+    const response = await axios.get(`/api/certificates/verify/${encodeURIComponent(code)}`);
+    return response.data;
   },
 };
 

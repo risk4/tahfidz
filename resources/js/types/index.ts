@@ -322,6 +322,63 @@ export interface ProgressStats {
   total_juz: number;
 }
 
+export interface Certificate {
+  id: number;
+  certificate_number: string;
+  student_id: number;
+  juz_count: number;
+  issued_date: string;
+  pembina_name?: string | null;
+  pengajar_name?: string | null;
+  verification_code: string;
+  notes?: string | null;
+  created_at?: string;
+  juz_label?: string;
+  institution_name?: string | null;
+  institution_city?: string | null;
+  institution_logo_path?: string | null;
+  student?: {
+    id: number;
+    name: string;
+    student_code?: string | null;
+    class_name?: string | null;
+    class_room?: { id: number; name: string } | null;
+  } | null;
+}
+
+export interface EligibleStudent {
+  student_id: number;
+  name: string;
+  student_code?: string | null;
+  class_name?: string | null;
+  starting_juz?: number;
+  total_juz_completed: number;
+  certified_max_juz: number;
+  juz_label: string;
+  already_certified: boolean;
+}
+
+export interface CertificateStats {
+  total_certificates: number;
+  total_recipients: number;
+  eligible_students: number;
+  kamil_count: number;
+}
+
+export interface CertificateVerifyResponse {
+  valid: boolean;
+  message?: string;
+  certificate?: {
+    certificate_number: string;
+    juz_count: number;
+    juz_label: string;
+    issued_date: string;
+    institution_name: string;
+    student_name: string;
+    class_name?: string | null;
+  };
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   current_page: number;
