@@ -222,9 +222,14 @@ class AppUpdateService
 
             // Dependensi PHP (composer) — wajib ada di lingkungan produksi.
             if (! $this->aborted) {
-                if ($this->commandExists('composer')) {
+                $composer = $this->composerBin();
+
+                if ($composer !== null) {
+                    $this->logLine("[INFO] composer: {$composer}");
+                    yield ['type' => 'output', 'line' => "[INFO] composer: {$composer}"];
+
                     $composerArgs = [
-                        'composer', 'install', '--no-interaction', '--prefer-dist', '--optimize-autoloader',
+                        $composer, 'install', '--no-interaction', '--prefer-dist', '--optimize-autoloader',
                     ];
 
                     if (app()->environment('production')) {
@@ -233,39 +238,59 @@ class AppUpdateService
 
                     yield from $this->runStep('Memperbarui dependensi PHP (composer)', $composerArgs);
                 } else {
-                    $this->logLine('[SKIP] composer tidak ditemukan — dependensi PHP dilewati.');
-                    yield ['type' => 'output', 'line' => '[SKIP] composer tidak ditemukan — dependensi PHP dilewati.'];
+                    $this->logLine('[SKIP] composer tidak ditemukan di server — dependensi PHP dilewati.');
+                    yield ['type' => 'output', 'line' => '[SKIP] composer tidak ditemukan di server — dependensi PHP dilewati.'];
                 }
             }
 
             // Build aset frontend (npm) — hanya bila npm tersedia.
             if (! $this->aborted) {
-                if ($this->commandExists('npm')) {
+                $npm = $this->npmBin();
+
+                if ($npm !== null) {
+                    $this->logLine("[INFO] npm: {$npm}");
+                    yield ['type' => 'output', 'line' => "[INFO] npm: {$npm}"];
+
                     yield ['type' => 'step', 'key' => 'assets', 'label' => 'Membangun aset frontend (npm)'];
                     $this->logLine('→ Membangun aset frontend (npm)');
 
                     yield from $this->runCommand(
-                        ['npm', 'ci', '--prefer-offline', '--no-audit', '--no-fund'],
+                        [$npm, 'ci', '--prefer-offline', '--no-audit', '--no-fund'],
                         critical: false,
                     );
 
                     if ($this->lastExitFailed) {
                         $this->logLine('[WARN] npm ci gagal — mencoba npm install...');
                         yield ['type' => 'output', 'line' => '[WARN] npm ci gagal — mencoba npm install...'];
-                        yield from $this->runCommand(['npm', 'install', '--no-audit', '--no-fund'], critical: false);
+                        yield from $this->runCommand([$npm, 'install', '--no-audit', '--no-fund'], critical: false);
                     }
 
-                    yield from $this->runCommand(['npm', 'run', 'build']);
+                    yield from $this->runCommand([$npm, 'run', 'build']);
                 } else {
-                    $this->logLine('[SKIP] npm tidak ditemukan — build aset dilewati.');
-                    yield ['type' => 'output', 'line' => '[SKIP] npm tidak ditemukan — build aset dilewati.'];
+                    $this->logLine('[SKIP] npm tidak ditemukan di server — build aset dilewati.');
+                    yield ['type' => 'output', 'line' => '[SKIP] npm tidak ditemukan di server — build aset dilewati.'];
                 }
             }
 
             // Perintah Laravel.
             if (! $this->aborted) {
-                $php = PHP_BINARY;
+                $php = $this->phpCli();
                 $artisan = base_path('artisan');
+
+                if ($php === null) {
+                    $message = 'Binary PHP CLI tidak ditemukan — pastikan php tersedia (mis. /www/server/php/*/bin/php '
+                        .'pada panel aaPanel) atau sesuaikan PATH user web.';
+                    $this->finishState(false, $message);
+                    $this->aborted = true;
+
+                    yield ['type' => 'output', 'line' => '[ERROR] '.$message];
+                    yield ['type' => 'done', 'success' => false, 'message' => $message];
+
+                    return;
+                }
+
+                $this->logLine("[INFO] PHP CLI: {$php}");
+                yield ['type' => 'output', 'line' => "[INFO] PHP CLI: {$php}"];
 
                 yield from $this->runStep('Menjalankan migrasi database', [$php, $artisan, 'migrate', '--force']);
 
@@ -320,6 +345,125 @@ class AppUpdateService
 
     /** Flag hasil eksekusi terakhir (untuk pola fallback npm). */
     private bool $lastExitFailed = false;
+
+    private ?string $phpCli = null;
+
+    private bool $phpCliResolved = false;
+
+    /**
+     * Binary PHP CLI yang benar. Pada lingkungan FPM, konstanta
+     * PHP_BINARY dapat menunjuk ke binary php-fpm yang tidak mampu
+     * menjalankan artisan — maka cari kandidat CLI lain bertahap.
+     */
+    private function phpCli(): ?string
+    {
+        if ($this->phpCliResolved) {
+            return $this->phpCli;
+        }
+
+        $this->phpCliResolved = true;
+
+        $candidates = [];
+
+        if (! str_contains(strtolower((string) PHP_BINARY), 'fpm')) {
+            $candidates[] = PHP_BINARY;
+        }
+
+        $candidates[] = 'php';
+
+        foreach ([
+            '/www/server/php/*/bin/php',       // aaPanel / BT Panel
+            '/usr/local/lsws/lsphp*/bin/php',  // OpenLiteSpeed
+            '/usr/local/php/*/bin/php',
+            '/usr/bin/php*',
+        ] as $pattern) {
+            foreach (glob($pattern) ?: [] as $path) {
+                $candidates[] = $path;
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            if ($this->isWorkingPhpCli($candidate)) {
+                return $this->phpCli = $candidate;
+            }
+        }
+
+        return $this->phpCli = '';
+    }
+
+    /** Validasi kandidat: ada, eksekusable, dan benar-benar CLI PHP. */
+    private function isWorkingPhpCli(string $candidate): bool
+    {
+        try {
+            if ($candidate !== 'php' && (! is_file($candidate) || ! is_executable($candidate))) {
+                return false;
+            }
+
+            $process = new Process([$candidate, '-v'], null, null, null, 15);
+            $process->run();
+
+            return $process->isSuccessful()
+                && str_contains($process->getOutput(), 'PHP')
+                && ! str_contains(strtolower($process->getOutput()), 'fpm');
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /** Lokasi binary composer, atau null bila tidak ditemukan. */
+    private function composerBin(): ?string
+    {
+        return $this->findBinary('composer', [
+            '/usr/local/bin/composer',
+            '/usr/bin/composer',
+            '/www/server/composer/composer',
+            '/root/.composer/composer',
+        ]);
+    }
+
+    /** Lokasi binary npm, atau null bila tidak ditemukan. */
+    private function npmBin(): ?string
+    {
+        return $this->findBinary('npm', [
+            '/usr/local/bin/npm',
+            '/usr/bin/npm',
+            '/www/server/nvm/versions/node/*/bin/npm',  // aaPanel Node.js via nvm
+            '/www/server/nodejs/*/bin/npm',
+        ]);
+    }
+
+    /**
+     * Cari binary: nama di PATH lebih dulu, lalu lokasi literal & glob
+     * khas panel hosting. Glob dipilih kandidat dengan versi tertinggi.
+     */
+    private function findBinary(string $bareName, array $extraPaths): ?string
+    {
+        if ($this->commandExists($bareName)) {
+            return $bareName;
+        }
+
+        $candidates = [];
+
+        foreach ($extraPaths as $path) {
+            if (str_contains($path, '*')) {
+                foreach (glob($path) ?: [] as $found) {
+                    $candidates[] = $found;
+                }
+            } else {
+                $candidates[] = $path;
+            }
+        }
+
+        sort($candidates, SORT_STRING);
+
+        foreach (array_reverse($candidates) as $candidate) {
+            if (is_file($candidate) && is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
 
     /**
      * Satu langkah bernama: emit event step lalu jalankan perintahnya.
