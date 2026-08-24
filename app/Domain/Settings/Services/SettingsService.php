@@ -3,6 +3,7 @@
 namespace App\Domain\Settings\Services;
 
 use App\Domain\Settings\Models\AppSetting;
+use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -96,6 +97,11 @@ class SettingsService
                 'save_enabled' => false,
             ],
             'security' => ['session_timeout_minutes' => 30, 'two_factor_auth' => false, 'login_notification' => false],
+            // Aset khusus sertifikat (diunggah via endpoint logo dengan key
+            // certificate.seal_path — bukan lewat PUT /settings/{group}).
+            'certificate' => [
+                'seal_path' => null,
+            ],
             'backup' => [
                 'schedule_time' => '02:00',
                 'retention_days' => 30,
@@ -269,7 +275,7 @@ class SettingsService
                 continue;
             }
 
-            $createdAt = \Carbon\Carbon::createFromFormat('Ymd_His', $matches[1]);
+            $createdAt = Carbon::createFromFormat('Ymd_His', $matches[1]);
             if ($createdAt && $createdAt->lt($cutoff) && Storage::disk('local')->delete($path)) {
                 $deleted++;
             }

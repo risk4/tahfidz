@@ -16,7 +16,7 @@ class UploadLogoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'key' => ['required', Rule::in(['profile.logo_path', 'application.logo_path', 'application.favicon_path'])],
+            'key' => ['required', Rule::in(['profile.logo_path', 'application.logo_path', 'application.favicon_path', 'certificate.seal_path'])],
             'file' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ];
     }

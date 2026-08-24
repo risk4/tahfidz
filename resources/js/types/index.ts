@@ -329,7 +329,9 @@ export interface Certificate {
   juz_count: number;
   issued_date: string;
   pembina_name?: string | null;
+  pembina_label?: string | null;
   pengajar_name?: string | null;
+  pengajar_label?: string | null;
   verification_code: string;
   notes?: string | null;
   created_at?: string;
@@ -337,6 +339,7 @@ export interface Certificate {
   institution_name?: string | null;
   institution_city?: string | null;
   institution_logo_path?: string | null;
+  institution_seal_path?: string | null;
   student?: {
     id: number;
     name: string;
@@ -479,6 +482,9 @@ export interface AppSettings {
   };
   recitation_check: {
     save_enabled: boolean;
+  };
+  certificate: {
+    seal_path: string | null;
   };
   security: {
     session_timeout_minutes: number;

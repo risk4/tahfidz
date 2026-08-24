@@ -724,7 +724,9 @@ export const certificateService = {
     juz_count: number;
     issued_date: string;
     pembina_name?: string | null;
+    pembina_label?: string | null;
     pengajar_name?: string | null;
+    pengajar_label?: string | null;
     notes?: string | null;
   }): Promise<{ message: string; certificate: Certificate }> {
     const response = await api.post('/certificates', data);

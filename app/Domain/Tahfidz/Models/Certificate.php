@@ -13,7 +13,8 @@ class Certificate extends Model
 
     protected $fillable = [
         'certificate_number', 'student_id', 'juz_count', 'issued_date',
-        'pembina_name', 'pengajar_name', 'verification_code', 'notes', 'issued_by',
+        'pembina_name', 'pembina_label', 'pengajar_name', 'pengajar_label',
+        'verification_code', 'notes', 'issued_by',
     ];
 
     protected function casts(): array

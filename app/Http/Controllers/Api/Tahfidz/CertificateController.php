@@ -168,7 +168,9 @@ class CertificateController extends Controller
             'juz_count' => ['required', 'integer', 'min:1', 'max:30'],
             'issued_date' => ['required', 'date'],
             'pembina_name' => ['nullable', 'string', 'max:120'],
+            'pembina_label' => ['nullable', 'string', 'max:60'],
             'pengajar_name' => ['nullable', 'string', 'max:120'],
+            'pengajar_label' => ['nullable', 'string', 'max:60'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -185,7 +187,9 @@ class CertificateController extends Controller
                 (int) $validated['juz_count'],
                 $validated['issued_date'],
                 $validated['pembina_name'] ?? null,
+                $validated['pembina_label'] ?? null,
                 $validated['pengajar_name'] ?? null,
+                $validated['pengajar_label'] ?? null,
                 $validated['notes'] ?? null,
                 $user->id,
             );

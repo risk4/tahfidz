@@ -30,7 +30,10 @@ export interface CertificateTemplateData {
   institutionCity?: string | null;
   issuedDateFormatted: string;
   pembinaName?: string | null;
+  pembinaLabel?: string | null;
   pengajarName?: string | null;
+  pengajarLabel?: string | null;
+  sealUrl?: string | null;
   verifyUrl: string;
   qrDataUrl?: string | null;
   logoUrl?: string | null;
@@ -49,7 +52,7 @@ export interface CertificateTemplateProps {
  * sering gagal merender fill SVG gradient saat ekspor PDF.
  * ================================================================ */
 
-/** Aliran hijau zamrud asimetris dari sudut kanan-atas + garis emas. */
+/** Aliran hijau zamrud kecil dari sudut kanan-atas + garis emas (samar). */
 function TopRightFlow() {
   const ellipse = (extra: React.CSSProperties): React.CSSProperties => ({
     position: 'absolute',
@@ -61,45 +64,36 @@ function TopRightFlow() {
   return (
     <>
       {/* halo sage transparan */}
-      <div style={ellipse({ top: -340, right: -190, width: 780, height: 600, background: 'rgba(16,114,69,0.09)' })} />
+      <div style={ellipse({ top: -290, right: -180, width: 470, height: 370, background: 'rgba(16,114,69,0.08)' })} />
       {/* bentuk utama emerald */}
       <div
         style={ellipse({
-          top: -300,
+          top: -248,
           right: -150,
-          width: 650,
-          height: 530,
+          width: 420,
+          height: 320,
           background: 'linear-gradient(135deg, #0E7245 0%, #0A5C3C 45%, #084A2E 100%)',
         })}
       />
       {/* garis aksen emas tipis mengikuti alur lengkung */}
       <div
         style={ellipse({
-          top: -318,
-          right: -172,
-          width: 700,
-          height: 578,
-          border: `1.6px solid ${C.goldSoft}`,
-          opacity: 0.9,
-        })}
-      />
-      <div
-        style={ellipse({
-          top: -356,
-          right: -230,
-          width: 790,
-          height: 668,
-          border: '1px solid rgba(217,188,107,0.55)',
+          top: -262,
+          right: -164,
+          width: 452,
+          height: 356,
+          border: `1.5px solid ${C.goldSoft}`,
+          opacity: 0.85,
         })}
       />
       {/* titik emas kecil */}
-      <div style={ellipse({ top: 234, right: 208, width: 6, height: 6, background: C.goldSoft })} />
-      <div style={ellipse({ top: 222, right: 194, width: 3.5, height: 3.5, background: C.goldSoft })} />
+      <div style={ellipse({ top: 96, right: 238, width: 5, height: 5, background: C.goldSoft })} />
+      <div style={ellipse({ top: 86, right: 226, width: 3, height: 3, background: C.goldSoft })} />
     </>
   );
 }
 
-/** Aliran hijau lebih kecil dari sudut kiri-bawah + garis emas. */
+/** Aliran hijau kecil dari sudut kiri-bawah + garis emas (samar). */
 function BottomLeftFlow() {
   const ellipse = (extra: React.CSSProperties): React.CSSProperties => ({
     position: 'absolute',
@@ -111,29 +105,29 @@ function BottomLeftFlow() {
   return (
     <>
       {/* halo sage transparan */}
-      <div style={ellipse({ bottom: -250, left: -220, width: 620, height: 480, background: 'rgba(16,114,69,0.09)' })} />
+      <div style={ellipse({ bottom: -215, left: -175, width: 360, height: 285, background: 'rgba(16,114,69,0.08)' })} />
       {/* bentuk utama emerald */}
       <div
         style={ellipse({
-          bottom: -215,
-          left: -185,
-          width: 520,
-          height: 400,
+          bottom: -185,
+          left: -148,
+          width: 310,
+          height: 235,
           background: 'linear-gradient(315deg, #0E7245 0%, #0A5C3C 45%, #084A2E 100%)',
         })}
       />
       {/* garis aksen emas tipis */}
       <div
         style={ellipse({
-          bottom: -232,
-          left: -203,
-          width: 560,
-          height: 442,
-          border: `1.5px solid ${C.goldSoft}`,
-          opacity: 0.9,
+          bottom: -196,
+          left: -158,
+          width: 334,
+          height: 262,
+          border: `1.4px solid ${C.goldSoft}`,
+          opacity: 0.85,
         })}
       />
-      <div style={ellipse({ bottom: 118, left: 268, width: 5, height: 5, background: C.goldSoft })} />
+      <div style={ellipse({ bottom: 62, left: 178, width: 4.5, height: 4.5, background: C.goldSoft })} />
     </>
   );
 }
@@ -276,8 +270,29 @@ function OrnamentDivider() {
   );
 }
 
-/** Segel medali resmi emas-hijau di bagian bawah tengah. */
-function Seal() {
+/** Segel medali resmi emas-hijau di bagian bawah tengah — atau logo kustom lembaga. */
+function Seal({ sealUrl }: { sealUrl?: string | null }) {
+  if (sealUrl) {
+    return (
+      <div
+        style={{
+          width: 104,
+          height: 104,
+          borderRadius: '50%',
+          border: `3px solid ${C.gold}`,
+          padding: 5,
+          background: '#FFFFFF',
+          boxSizing: 'border-box',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <img src={sealUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+      </div>
+    );
+  }
+
   return (
     <svg width={112} height={112} viewBox="0 0 112 112" aria-label="Segel resmi">
       <circle cx={56} cy={56} r={53} fill="#FFFFFF" stroke={C.gold} strokeWidth={3} />
@@ -325,27 +340,24 @@ function SignatureBlock({ role, name }: { role: string; name?: string | null }) 
       </p>
       <div style={{ height: 44 }} />
       {name ? (
-        <>
-          <p
-            style={{
-              margin: 0,
-              fontFamily: SCRIPT,
-              fontSize: 21,
-              lineHeight: 1.2,
-              color: C.ink,
-              borderBottom: `1.4px solid ${C.deep}`,
-              display: 'inline-block',
-              paddingBottom: 2,
-              maxWidth: '100%',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {name}
-          </p>
-          <p style={{ margin: '3px 0 0', fontSize: 9.5, color: C.slateSoft }}>Pembimbing Hafalan</p>
-        </>
+        <p
+          style={{
+            margin: 0,
+            fontFamily: SCRIPT,
+            fontSize: 21,
+            lineHeight: 1.2,
+            color: C.ink,
+            borderBottom: `1.4px solid ${C.deep}`,
+            display: 'inline-block',
+            paddingBottom: 2,
+            maxWidth: '100%',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {name}
+        </p>
       ) : (
         <p style={{ margin: 0, fontSize: 13, color: C.slateSoft, letterSpacing: '0.06em' }}>
           (&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)
@@ -547,9 +559,9 @@ const CertificateTemplate = forwardRef<HTMLDivElement, CertificateTemplateProps>
               justifyContent: 'space-between',
             }}
           >
-            <SignatureBlock role="Pembina Tahfidz" name={data.pembinaName} />
-            <Seal />
-            <SignatureBlock role="Pengajar Tahfidz" name={data.pengajarName} />
+            <SignatureBlock role={data.pembinaLabel || 'Pembina Tahfidz'} name={data.pembinaName} />
+            <Seal sealUrl={data.sealUrl} />
+            <SignatureBlock role={data.pengajarLabel || 'Pengajar Tahfidz'} name={data.pengajarName} />
 
             {/* Verifikasi QR + tanggal — kanan bawah */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 128 }}>

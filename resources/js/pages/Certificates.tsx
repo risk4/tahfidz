@@ -15,6 +15,7 @@ import {
   Search,
   ShieldCheck,
   Trash2,
+  Upload,
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,7 +27,7 @@ import CertificateTemplate, {
   CERTIFICATE_WIDTH,
 } from '@/components/certificates/CertificateTemplate';
 import type { CertificateTemplateData } from '@/components/certificates/CertificateTemplate';
-import { certificateService, classService } from '@/services/api';
+import { certificateService, classService, settingsService } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import {
   buildJuzLabel,
@@ -36,7 +37,7 @@ import {
   printCertificate,
 } from '@/lib/certificate';
 import { formatDate, toDateInputValue } from '@/utils/date';
-import type { Certificate, CertificateStats, ClassRoom, EligibleStudent } from '@/types';
+import type { AppSettings, Certificate, CertificateStats, ClassRoom, EligibleStudent } from '@/types';
 
 /* ================================================================
  * Helpers & building blocks
@@ -95,7 +96,10 @@ function toTemplateData(cert: Certificate, qrDataUrl: string | null): Certificat
     institutionCity: cert.institution_city ?? null,
     issuedDateFormatted: formatDate(cert.issued_date),
     pembinaName: cert.pembina_name ?? null,
+    pembinaLabel: cert.pembina_label ?? 'Pembina Tahfidz',
     pengajarName: cert.pengajar_name ?? null,
+    pengajarLabel: cert.pengajar_label ?? 'Pengajar Tahfidz',
+    sealUrl: cert.institution_seal_path ? `/storage/${cert.institution_seal_path}` : null,
     verifyUrl: buildVerifyUrl(cert.verification_code),
     qrDataUrl,
     logoUrl: cert.institution_logo_path ? `/storage/${cert.institution_logo_path}` : null,
@@ -254,8 +258,41 @@ function IssueCertificateModal({
   const [juzCount, setJuzCount] = useState<number | ''>('');
   const [issuedDate, setIssuedDate] = useState(toDateInputValue(new Date()));
   const [pembinaName, setPembinaName] = useState('');
+  const [pembinaLabel, setPembinaLabel] = useState('Pembina Tahfidz');
   const [pengajarName, setPengajarName] = useState('');
+  const [pengajarLabel, setPengajarLabel] = useState('Pengajar Tahfidz');
   const [notes, setNotes] = useState('');
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const sealFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!toastMsg) return;
+    const t = setTimeout(() => setToastMsg(null), 2800);
+    return () => clearTimeout(t);
+  }, [toastMsg]);
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => settingsService.all(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const currentSeal = (settings as AppSettings | undefined)?.certificate?.seal_path ?? null;
+
+  const sealUpload = useMutation({
+    mutationFn: (file: File) => settingsService.uploadLogo('certificate.seal_path', file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      setToastMsg('Segel berhasil diperbarui.');
+    },
+  });
+
+  const sealDelete = useMutation({
+    mutationFn: () => settingsService.deleteLogo('certificate.seal_path'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      setToastMsg('Segel dihapus — menggunakan segel bawaan.');
+    },
+  });
 
   const { data: eligibleData, isLoading } = useQuery({
     queryKey: ['certificate-eligible'],
@@ -297,7 +334,9 @@ function IssueCertificateModal({
         juz_count: Number(juzCount),
         issued_date: issuedDate,
         pembina_name: pembinaName.trim() || null,
+        pembina_label: pembinaLabel.trim() || null,
         pengajar_name: pengajarName.trim() || null,
+        pengajar_label: pengajarLabel.trim() || null,
         notes: notes.trim() || null,
       }),
     onSuccess: async (res) => {
@@ -317,6 +356,11 @@ function IssueCertificateModal({
   return (
     <Modal title="Terbitkan Sertifikat" subtitle="Penghargaan capaian hafalan juz santri" onClose={onClose}>
       <div className="space-y-4 p-6">
+        {toastMsg && (
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700">
+            ✓ {toastMsg}
+          </div>
+        )}
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-slate-700">Santri</label>
           {isLoading ? (
@@ -362,7 +406,34 @@ function IssueCertificateModal({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Nama Pembina Tahfidz</label>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Peran Tanda Tangan Kiri</label>
+                <Input
+                  list="role-label-presets"
+                  placeholder="Mis. Kepala Madrasah"
+                  value={pembinaLabel}
+                  onChange={(e) => setPembinaLabel(e.target.value)}
+                  maxLength={60}
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Peran Tanda Tangan Kanan</label>
+                <Input
+                  list="role-label-presets"
+                  placeholder="Mis. Pengajar Tahfidz"
+                  value={pengajarLabel}
+                  onChange={(e) => setPengajarLabel(e.target.value)}
+                  maxLength={60}
+                />
+              </div>
+              <datalist id="role-label-presets">
+                <option value="Pembina Tahfidz" />
+                <option value="Kepala Madrasah" />
+                <option value="Kepala Sekolah" />
+                <option value="Ketua Yayasan" />
+                <option value="Pengajar Tahfidz" />
+              </datalist>
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Nama {pembinaLabel || 'Pembina'}</label>
                 <Input
                   placeholder="Mis. Ust. Ahmad, Lc."
                   value={pembinaName}
@@ -371,13 +442,69 @@ function IssueCertificateModal({
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Nama Pengajar Tahfidz</label>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Nama {pengajarLabel || 'Pengajar'}</label>
                 <Input
                   placeholder="Mis. Ust. Muhammad, M.Pd."
                   value={pengajarName}
                   onChange={(e) => setPengajarName(e.target.value)}
                   maxLength={120}
                 />
+              </div>
+            </div>
+
+            {/* Segel lembaga */}
+            <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-700">Segel / Stempel Lembaga</p>
+                  <p className="text-xs text-slate-400">
+                    Tampil di tengah bawah sertifikat. Kosongkan untuk memakai segel bawaan.
+                  </p>
+                </div>
+                <div
+                  className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-amber-400/80 bg-white"
+                  title={currentSeal ? 'Segel kustom' : 'Segel bawaan'}
+                >
+                  {currentSeal ? (
+                    <img src={`/storage/${currentSeal}`} alt="" className="h-full w-full object-contain p-1" />
+                  ) : (
+                    <Award className="h-6 w-6 text-emerald-600" />
+                  )}
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  ref={sealFileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (file) sealUpload.mutate(file);
+                  }}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={sealUpload.isPending || sealDelete.isPending}
+                  onClick={() => sealFileRef.current?.click()}
+                >
+                  {sealUpload.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  Unggah Segel
+                </Button>
+                {currentSeal && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                    disabled={sealDelete.isPending}
+                    onClick={() => sealDelete.mutate()}
+                  >
+                    {sealDelete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    Hapus
+                  </Button>
+                )}
               </div>
             </div>
 

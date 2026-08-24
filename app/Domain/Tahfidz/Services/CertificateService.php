@@ -6,6 +6,7 @@ use App\Domain\People\Models\Student;
 use App\Domain\Settings\Services\SettingsService;
 use App\Domain\Tahfidz\Models\Certificate;
 use App\Domain\Tahfidz\Models\StudentAyahCoverage;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -68,7 +69,9 @@ class CertificateService
         int $juzCount,
         string $issuedDate,
         ?string $pembinaName = null,
+        ?string $pembinaLabel = null,
         ?string $pengajarName = null,
+        ?string $pengajarLabel = null,
         ?string $notes = null,
         ?int $issuedBy = null,
     ): Certificate {
@@ -93,17 +96,41 @@ class CertificateService
             );
         }
 
-        return Certificate::create([
-            'certificate_number' => $this->generateNumber(),
-            'student_id' => $student->id,
-            'juz_count' => $juzCount,
-            'issued_date' => $issuedDate,
-            'pembina_name' => $pembinaName !== '' ? $pembinaName : null,
-            'pengajar_name' => $pengajarName !== '' ? $pengajarName : null,
-            'verification_code' => Str::random(48),
-            'notes' => $notes,
-            'issued_by' => $issuedBy,
-        ]);
+        try {
+            return Certificate::create([
+                'certificate_number' => $this->generateNumber(),
+                'student_id' => $student->id,
+                'juz_count' => $juzCount,
+                'issued_date' => $issuedDate,
+                'pembina_name' => $this->nullIfBlank($pembinaName),
+                'pembina_label' => $this->nullIfBlank($pembinaLabel, 'Pembina Tahfidz'),
+                'pengajar_name' => $this->nullIfBlank($pengajarName),
+                'pengajar_label' => $this->nullIfBlank($pengajarLabel, 'Pengajar Tahfidz'),
+                'verification_code' => Str::random(48),
+                'notes' => $notes,
+                'issued_by' => $issuedBy,
+            ]);
+        } catch (QueryException $e) {
+            // 1062 = duplicate entry — mis. sisa baris soft delete pada
+            // database lama atau kondisi balapan dua penerbitan bersamaan.
+            if ((int) ($e->errorInfo[1] ?? 0) === 1062) {
+                throw new InvalidArgumentException(
+                    "Sertifikat tingkat {$juzCount} juz untuk santri ini sudah pernah diterbitkan."
+                );
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Normalisasi input teks: kosong → null (atau label bawaan).
+     */
+    private function nullIfBlank(?string $value, ?string $fallback = null): ?string
+    {
+        $trimmed = trim((string) $value);
+
+        return $trimmed !== '' ? $trimmed : $fallback;
     }
 
     /**
@@ -148,11 +175,14 @@ class CertificateService
             'juz_label' => $this->juzLabel($certificate->student, (int) $certificate->juz_count),
             'issued_date' => $certificate->issued_date?->toDateString(),
             'pembina_name' => $certificate->pembina_name,
+            'pembina_label' => $certificate->pembina_label ?? 'Pembina Tahfidz',
             'pengajar_name' => $certificate->pengajar_name,
+            'pengajar_label' => $certificate->pengajar_label ?? 'Pengajar Tahfidz',
             'notes' => $certificate->notes,
             'institution_name' => $profile['name'] ?? null,
             'institution_city' => $profile['city'] ?? null,
             'institution_logo_path' => $profile['logo_path'] ?? null,
+            'institution_seal_path' => $this->settings->rawGroup('certificate')['seal_path'] ?? null,
             'student' => [
                 'id' => $certificate->student?->id,
                 'name' => $certificate->student?->name,
