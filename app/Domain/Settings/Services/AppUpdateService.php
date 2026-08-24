@@ -265,7 +265,12 @@ class AppUpdateService
                         yield from $this->runCommand([$npm, 'install', '--no-audit', '--no-fund'], critical: false);
                     }
 
-                    yield from $this->runCommand([$npm, 'run', 'build']);
+                    // Beri ruang heap eksplisit — pada VPS RAM kecil, batas
+                    // bawaan Node sering membuat vite/rollup kehabisan memori.
+                    yield from $this->runCommand(
+                        [$npm, 'run', 'build'],
+                        env: ['NODE_OPTIONS' => '--max-old-space-size=1536'],
+                    );
                 } else {
                     $this->logLine('[SKIP] npm tidak ditemukan di server — build aset dilewati.');
                     yield ['type' => 'output', 'line' => '[SKIP] npm tidak ditemukan di server — build aset dilewati.'];
@@ -492,7 +497,7 @@ class AppUpdateService
     /**
      * Jalankan perintah sambil men-streaming keluarannya sebagai event.
      */
-    private function runCommand(array $command, ?string $label = null, bool $critical = true): \Generator
+    private function runCommand(array $command, ?string $label = null, bool $critical = true, array $env = []): \Generator
     {
         $this->lastExitFailed = false;
 
@@ -501,7 +506,7 @@ class AppUpdateService
             $this->logLine("→ {$label}");
         }
 
-        $process = new Process($command, base_path(), null, null, self::PROCESS_TIMEOUT);
+        $process = new Process($command, base_path(), $env, null, self::PROCESS_TIMEOUT);
         $process->start();
 
         foreach ($process as $type => $buffer) {
