@@ -411,7 +411,7 @@ class AppUpdateService
         );
         $finder->run(null, ['binary' => $binary]);
 
-        return $finder->successful();
+        return $finder->isSuccessful();
     }
 
     /* ================================================================

@@ -2922,9 +2922,14 @@ function UpdateSection() {
           )}
 
           {!result?.error && result?.up_to_date && (
-            <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              Aplikasi sudah berada pada versi terbaru.
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+              <p className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                Aplikasi sudah berada pada versi terbaru.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => setConfirmOpen(true)} disabled={updating}>
+                <RefreshCw className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} /> Jalankan Ulang Deploy
+              </Button>
             </div>
           )}
 
@@ -3035,7 +3040,11 @@ function UpdateSection() {
             <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <div className="space-y-1">
-                <p>Aplikasi akan diperbarui sebanyak {result?.behind} commit.</p>
+                <p>
+                  {result?.behind && result.behind > 0
+                    ? `Aplikasi akan diperbarui sebanyak ${result.behind} commit.`
+                    : 'Menjalankan ulang seluruh proses deploy (dependensi, build aset, migrasi, cache).'}
+                </p>
                 <ul className="list-disc space-y-0.5 pl-4 text-xs leading-relaxed">
                   <li>Perubahan file lokal yang belum di-commit akan ditimpa.</li>
                   <li>Aplikasi tidak dapat diakses sesaat selama proses berlangsung.</li>
