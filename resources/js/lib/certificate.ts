@@ -59,7 +59,7 @@ export async function downloadCertificatePdf(rootEl: HTMLElement, fileName: stri
 
   const canvas = await html2canvas(rootEl, {
     scale: 2,
-    backgroundColor: '#FCFBF6',
+    backgroundColor: '#FFFFFF',
     useCORS: true,
     logging: false,
   });

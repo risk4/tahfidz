@@ -4,12 +4,10 @@ import { forwardRef } from 'react';
  * Palet warna sertifikat (hex — aman untuk html2canvas & print)
  * ================================================================ */
 const C = {
-  ivory: '#FCFBF6',
+  ivory: '#FFFFFF',
   ink: '#0A3D27',
   deep: '#0B5D3B',
   forest: '#0E7245',
-  sageLine: 'rgba(14,114,69,0.055)',
-  mosque: 'rgba(16,94,60,0.10)',
   slate: '#5B7268',
   slateSoft: '#8AA096',
   gold: '#C9A227',
@@ -43,105 +41,132 @@ export interface CertificateTemplateProps {
 }
 
 /* ================================================================
- * Ornamen SVG
+ * Ornamen dekoratif
+ *
+ * Catatan teknis: ornamen sengaja dibangun dari <div> dengan CSS
+ * background-image: linear-gradient + border-radius (bukan SVG
+ * gradient), karena html2canvas mendukung penuh CSS gradient namun
+ * sering gagal merender fill SVG gradient saat ekspor PDF.
  * ================================================================ */
 
-/** Aliran hijau zamrud asimetris dari sudut kanan-atas + garis emas tipis. */
+/** Aliran hijau zamrud asimetris dari sudut kanan-atas + garis emas. */
 function TopRightFlow() {
+  const ellipse = (extra: React.CSSProperties): React.CSSProperties => ({
+    position: 'absolute',
+    borderRadius: '50%',
+    pointerEvents: 'none',
+    ...extra,
+  });
+
   return (
-    <svg
-      width={430}
-      height={310}
-      viewBox="0 0 430 310"
-      style={{ position: 'absolute', top: 0, right: 0 }}
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id="trf-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={C.forest} />
-          <stop offset="100%" stopColor="#084A2E" />
-        </linearGradient>
-      </defs>
-      {/* lapis sage transparan di bawah */}
-      <path
-        d="M0 0 H360 C300 58 288 108 302 150 C352 162 402 214 430 310 L430 0 Z"
-        fill="rgba(16,114,69,0.09)"
+    <>
+      {/* halo sage transparan */}
+      <div style={ellipse({ top: -340, right: -190, width: 780, height: 600, background: 'rgba(16,114,69,0.09)' })} />
+      {/* bentuk utama emerald */}
+      <div
+        style={ellipse({
+          top: -300,
+          right: -150,
+          width: 650,
+          height: 530,
+          background: 'linear-gradient(135deg, #0E7245 0%, #0A5C3C 45%, #084A2E 100%)',
+        })}
       />
-      {/* bentuk utama */}
-      <path
-        d="M0 0 H312 C252 66 244 116 258 158 C332 170 396 226 430 310 V0 Z"
-        fill="url(#trf-g)"
+      {/* garis aksen emas tipis mengikuti alur lengkung */}
+      <div
+        style={ellipse({
+          top: -318,
+          right: -172,
+          width: 700,
+          height: 578,
+          border: `1.6px solid ${C.goldSoft}`,
+          opacity: 0.9,
+        })}
       />
-      {/* aksen garis emas tipis mengikuti alur */}
-      <path
-        d="M330 8 C280 64 272 110 284 148 C350 162 404 216 424 292"
-        fill="none"
-        stroke={C.goldSoft}
-        strokeWidth={1.6}
-        strokeLinecap="round"
+      <div
+        style={ellipse({
+          top: -356,
+          right: -230,
+          width: 790,
+          height: 668,
+          border: '1px solid rgba(217,188,107,0.55)',
+        })}
       />
-      <path
-        d="M20 0 C60 34 118 52 178 50"
-        fill="none"
-        stroke={C.goldSoft}
-        strokeWidth={1}
-        strokeLinecap="round"
-        opacity={0.85}
-      />
-      <circle cx={196} cy={54} r={3} fill={C.goldSoft} />
-      <circle cx={210} cy={48} r={1.6} fill={C.goldSoft} />
-    </svg>
+      {/* titik emas kecil */}
+      <div style={ellipse({ top: 234, right: 208, width: 6, height: 6, background: C.goldSoft })} />
+      <div style={ellipse({ top: 222, right: 194, width: 3.5, height: 3.5, background: C.goldSoft })} />
+    </>
   );
 }
 
 /** Aliran hijau lebih kecil dari sudut kiri-bawah + garis emas. */
 function BottomLeftFlow() {
+  const ellipse = (extra: React.CSSProperties): React.CSSProperties => ({
+    position: 'absolute',
+    borderRadius: '50%',
+    pointerEvents: 'none',
+    ...extra,
+  });
+
   return (
-    <svg
-      width={380}
-      height={250}
-      viewBox="0 0 380 250"
-      style={{ position: 'absolute', bottom: 56, left: 0 }}
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id="blf-g" x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor="#084A2E" />
-          <stop offset="100%" stopColor={C.forest} />
-        </linearGradient>
-      </defs>
-      <path
-        d="M0 250 V70 C52 92 84 120 94 152 C160 162 216 200 262 250 Z"
-        fill="rgba(16,114,69,0.09)"
+    <>
+      {/* halo sage transparan */}
+      <div style={ellipse({ bottom: -250, left: -220, width: 620, height: 480, background: 'rgba(16,114,69,0.09)' })} />
+      {/* bentuk utama emerald */}
+      <div
+        style={ellipse({
+          bottom: -215,
+          left: -185,
+          width: 520,
+          height: 400,
+          background: 'linear-gradient(315deg, #0E7245 0%, #0A5C3C 45%, #084A2E 100%)',
+        })}
       />
-      <path
-        d="M0 250 V112 C44 130 68 154 78 180 C136 190 186 220 228 250 Z"
-        fill="url(#blf-g)"
+      {/* garis aksen emas tipis */}
+      <div
+        style={ellipse({
+          bottom: -232,
+          left: -203,
+          width: 560,
+          height: 442,
+          border: `1.5px solid ${C.goldSoft}`,
+          opacity: 0.9,
+        })}
       />
-      <path
-        d="M6 104 C46 124 62 146 72 172 C122 182 166 208 204 240"
-        fill="none"
-        stroke={C.goldSoft}
-        strokeWidth={1.5}
-        strokeLinecap="round"
-      />
-      <circle cx={222} cy={236} r={2.6} fill={C.goldSoft} />
-    </svg>
+      <div style={ellipse({ bottom: 118, left: 268, width: 5, height: 5, background: C.goldSoft })} />
+    </>
   );
 }
 
-/** Bingkai tipis emas — aksen stationery premium yang minimalis. */
+/** Bingkai ganda emas — aksen stationery premium yang tegas & minimalis. */
 function FrameBorder() {
   return (
-    <div
-      style={{
-        position: 'absolute',
-        inset: 22,
-        border: '1px solid rgba(201,162,39,0.32)',
-        pointerEvents: 'none',
-      }}
-      aria-hidden="true"
-    />
+    <>
+      <div
+        style={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          bottom: 16,
+          left: 16,
+          border: `2px solid rgba(201,162,39,0.85)`,
+          pointerEvents: 'none',
+        }}
+        aria-hidden="true"
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: 24,
+          right: 24,
+          bottom: 24,
+          left: 24,
+          border: '1px solid rgba(201,162,39,0.5)',
+          pointerEvents: 'none',
+        }}
+        aria-hidden="true"
+      />
+    </>
   );
 }
 
@@ -211,13 +236,9 @@ function Emblem({ logoUrl }: { logoUrl?: string | null }) {
   }
   return (
     <svg width={64} height={64} viewBox="0 0 64 64" aria-label="Emblem">
-      <defs>
-        <radialGradient id="emb-g" cx="0.5" cy="0.35" r="0.9">
-          <stop offset="0%" stopColor="#149163" />
-          <stop offset="100%" stopColor="#084A2E" />
-        </radialGradient>
-      </defs>
-      <circle cx={32} cy={32} r={30} fill="url(#emb-g)" stroke={C.gold} strokeWidth={2.4} />
+      <circle cx={32} cy={32} r={30} fill="#0D6B45" stroke={C.gold} strokeWidth={2.4} />
+      {/* kilau atas berlapis (pengganti gradient — aman untuk ekspor PDF) */}
+      <circle cx={32} cy={24} r={20} fill="rgba(255,255,255,0.10)" />
       <circle cx={32} cy={32} r={25} fill="none" stroke={C.goldSoft} strokeWidth={0.9} strokeDasharray="2 3" />
       {/* bulan sabit */}
       <path
@@ -228,11 +249,11 @@ function Emblem({ logoUrl }: { logoUrl?: string | null }) {
       {/* kitab terbuka */}
       <path
         d="M14 42 C19 38.6 25 38.6 31 41.4 V53 C25 50.2 19 50.2 14 53.6 Z"
-        fill="#FCFBF6"
+        fill="#FFFFFF"
       />
       <path
         d="M50 42 C45 38.6 39 38.6 33 41.4 V53 C39 50.2 45 50.2 50 53.6 Z"
-        fill="#FCFBF6"
+        fill="#FFFFFF"
       />
       <line x1={32} y1={41.4} x2={32} y2={53} stroke={C.goldSoft} strokeWidth={1.4} />
       <circle cx={49} cy={15} r={1.7} fill={C.goldSoft} />
@@ -259,15 +280,12 @@ function OrnamentDivider() {
 function Seal() {
   return (
     <svg width={112} height={112} viewBox="0 0 112 112" aria-label="Segel resmi">
-      <defs>
-        <radialGradient id="seal-g" cx="0.5" cy="0.32" r="0.95">
-          <stop offset="0%" stopColor="#159164" />
-          <stop offset="100%" stopColor="#073F27" />
-        </radialGradient>
-      </defs>
       <circle cx={56} cy={56} r={53} fill="#FFFFFF" stroke={C.gold} strokeWidth={3} />
       <circle cx={56} cy={56} r={45} fill="none" stroke={C.goldSoft} strokeWidth={1} strokeDasharray="2.5 3.5" />
-      <circle cx={56} cy={56} r={39} fill="url(#seal-g)" />
+      {/* piringan berlapis (pengganti gradient — aman untuk ekspor PDF) */}
+      <circle cx={56} cy={56} r={39} fill="#0F7A4E" />
+      <circle cx={56} cy={50} r={36} fill="rgba(255,255,255,0.08)" />
+      <circle cx={56} cy={56} r={30} fill="#08462C" />
       {/* bintang segi delapan tipis */}
       <g stroke="rgba(217,188,107,0.5)" strokeWidth={0.8} fill="none">
         <rect x={40} y={40} width={32} height={32} />
