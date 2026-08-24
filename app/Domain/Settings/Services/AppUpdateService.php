@@ -73,11 +73,15 @@ class AppUpdateService
         try {
             $result['current'] = $this->currentVersion();
         } catch (\Throwable $e) {
-            $result['error'] = str_contains($e->getMessage(), 'proc_open')
-                ? 'Fungsi PHP "proc_open" dinonaktifkan oleh server sehingga pembaruan tidak dapat menjalankan '
-                    .'perintah git/composer/npm. Hapus "proc_open" dan "proc_get_status" dari daftar '
-                    .'disable_functions pada pengaturan PHP Anda, lalu mulai ulang layanan PHP.'
-                : 'Perintah git tidak dapat dijalankan: '.$e->getMessage();
+            $result['error'] = match (true) {
+                str_contains($e->getMessage(), 'proc_open') => 'Fungsi PHP "proc_open" dinonaktifkan oleh server sehingga '
+                    .'pembaruan tidak dapat menjalankan perintah git/composer/npm. Hapus "proc_open" dan "proc_get_status" '
+                    .'dari daftar disable_functions pada pengaturan PHP Anda, lalu mulai ulang layanan PHP.',
+                str_contains($e->getMessage(), 'dubious ownership') => 'Git menolak membaca folder aplikasi karena '
+                    .'kepemilikan berbeda dari user web. Jalankan di server: "git config --system --add safe.directory '
+                    .base_path().'".',
+                default => 'Perintah git tidak dapat dijalankan: '.$e->getMessage(),
+            };
 
             return $result;
         }
