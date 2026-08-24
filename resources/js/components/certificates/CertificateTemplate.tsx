@@ -1,4 +1,4 @@
-import { forwardRef, useId } from 'react';
+import { forwardRef } from 'react';
 
 /* ================================================================
  * Palet warna sertifikat (hex — aman untuk html2canvas & print)
@@ -65,7 +65,7 @@ function TopRightFlow() {
       {/* lapis sage transparan di bawah */}
       <path
         d="M0 0 H360 C300 58 288 108 302 150 C352 162 402 214 430 310 L430 0 Z"
-        fill="rgba(16,114,69,0.14)"
+        fill="rgba(16,114,69,0.09)"
       />
       {/* bentuk utama */}
       <path
@@ -112,7 +112,7 @@ function BottomLeftFlow() {
       </defs>
       <path
         d="M0 250 V70 C52 92 84 120 94 152 C160 162 216 200 262 250 Z"
-        fill="rgba(16,114,69,0.13)"
+        fill="rgba(16,114,69,0.09)"
       />
       <path
         d="M0 250 V112 C44 130 68 154 78 180 C136 190 186 220 228 250 Z"
@@ -130,39 +130,22 @@ function BottomLeftFlow() {
   );
 }
 
-/** Pola geometri Islam halus di seluruh latar (hampir transparan). */
-function GeometricPattern({ id }: { id: string }) {
+/** Bingkai tipis emas — aksen stationery premium yang minimalis. */
+function FrameBorder() {
   return (
-    <svg
-      width={1123}
-      height={794}
-      viewBox="0 0 1123 794"
-      style={{ position: 'absolute', inset: 0 }}
+    <div
+      style={{
+        position: 'absolute',
+        inset: 22,
+        border: '1px solid rgba(201,162,39,0.32)',
+        pointerEvents: 'none',
+      }}
       aria-hidden="true"
-    >
-      <defs>
-        <pattern id={id} width={72} height={72} patternUnits="userSpaceOnUse">
-          <rect x={18} y={18} width={36} height={36} fill="none" stroke={C.deep} strokeWidth={1} opacity={0.55} />
-          <rect
-            x={18}
-            y={18}
-            width={36}
-            height={36}
-            fill="none"
-            stroke={C.deep}
-            strokeWidth={1}
-            opacity={0.55}
-            transform={`rotate(45 36 36)`}
-          />
-          <circle cx={36} cy={36} r={2} fill="none" stroke={C.deep} strokeWidth={1} opacity={0.45} />
-        </pattern>
-      </defs>
-      <rect width={1123} height={794} fill={`url(#${id})`} />
-    </svg>
+    />
   );
 }
 
-/** Siluet masjid minimalis di latar bagian bawah (hijau muda keabu-abuan). */
+/** Siluet masjid sangat samar di latar bagian bawah (hijau muda keabu-abuan). */
 function MosqueSilhouette() {
   return (
     <svg
@@ -172,7 +155,7 @@ function MosqueSilhouette() {
       style={{ position: 'absolute', bottom: 56, left: '50%', transform: 'translateX(-50%)' }}
       aria-hidden="true"
     >
-      <g fill="rgba(16,94,60,0.09)">
+      <g fill="rgba(16,94,60,0.035)">
         {/* menara kiri */}
         <rect x={128} y={38} width={13} height={94} rx={2} />
         <path d="M134.5 14 L144 38 H125 Z" />
@@ -185,7 +168,7 @@ function MosqueSilhouette() {
         <path d="M301.5 10 L310 30 H293 Z" />
         {/* kubah utama (bawang) */}
         <path d="M340 96 C340 62 362 46 374 30 C378 22 382 16 390 12 C398 16 402 22 406 30 C418 46 440 62 440 96 Z" />
-        <line x1={390} y1={12} x2={390} y2={0} stroke="rgba(16,94,60,0.09)" strokeWidth={3} />
+        <line x1={390} y1={12} x2={390} y2={0} stroke="rgba(16,94,60,0.035)" strokeWidth={3} />
         <circle cx={390} cy={2} r={3} />
         {/* bangunan utama */}
         <rect x={318} y={96} width={144} height={36} rx={3} />
@@ -365,8 +348,6 @@ export const CERTIFICATE_HEIGHT = 794;
 
 const CertificateTemplate = forwardRef<HTMLDivElement, CertificateTemplateProps>(
   function CertificateTemplate({ data }, ref) {
-    const patternId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
-
     return (
       <div
         ref={ref}
@@ -383,7 +364,7 @@ const CertificateTemplate = forwardRef<HTMLDivElement, CertificateTemplateProps>
           userSelect: 'none',
         }}
       >
-        <GeometricPattern id={patternId} />
+        <FrameBorder />
         <MosqueSilhouette />
         <TopRightFlow />
         <BottomLeftFlow />
