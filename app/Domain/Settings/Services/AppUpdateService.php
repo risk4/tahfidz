@@ -391,20 +391,23 @@ class AppUpdateService
         return $this->phpCli = '';
     }
 
-    /** Validasi kandidat: ada, eksekusable, dan benar-benar CLI PHP. */
+    /** Validasi kandidat: benar-benar CLI PHP dan bukan binary fpm.
+     *
+     * Pemeriksaan file sengaja dilewati karena open_basedir pada panel
+     * hosting melarang fungsi filesystem membaca luar folder situs —
+     * sedangkan eksekusi binary tetap diizinkan.
+     */
     private function isWorkingPhpCli(string $candidate): bool
     {
         try {
-            if ($candidate !== 'php' && (! is_file($candidate) || ! is_executable($candidate))) {
-                return false;
-            }
-
             $process = new Process([$candidate, '-v'], null, null, null, 15);
             $process->run();
 
+            $output = strtolower($process->getOutput());
+
             return $process->isSuccessful()
-                && str_contains($process->getOutput(), 'PHP')
-                && ! str_contains(strtolower($process->getOutput()), 'fpm');
+                && str_contains($output, 'php')
+                && ! str_contains($output, 'fpm');
         } catch (\Throwable) {
             return false;
         }
@@ -434,7 +437,11 @@ class AppUpdateService
 
     /**
      * Cari binary: nama di PATH lebih dulu, lalu lokasi literal & glob
-     * khas panel hosting. Glob dipilih kandidat dengan versi tertinggi.
+     * khas panel hosting. Kandidat divalidasi dengan mengeksekusi
+     * `--version` — bukan is_file() — karena open_basedir panel hosting
+     * melarang fungsi filesystem di luar folder situs, sedangkan
+     * eksekusi binary tetap diperbolehkan. Glob dipilih kandidat
+     * dengan versi tertinggi.
      */
     private function findBinary(string $bareName, array $extraPaths): ?string
     {
@@ -446,7 +453,7 @@ class AppUpdateService
 
         foreach ($extraPaths as $path) {
             if (str_contains($path, '*')) {
-                foreach (glob($path) ?: [] as $found) {
+                foreach ((@glob($path) ?: []) as $found) {
                     $candidates[] = $found;
                 }
             } else {
@@ -457,8 +464,15 @@ class AppUpdateService
         sort($candidates, SORT_STRING);
 
         foreach (array_reverse($candidates) as $candidate) {
-            if (is_file($candidate) && is_executable($candidate)) {
-                return $candidate;
+            try {
+                $process = new Process([$candidate, '--version'], null, null, null, 15);
+                $process->run();
+
+                if ($process->isSuccessful()) {
+                    return $candidate;
+                }
+            } catch (\Throwable) {
+                continue;
             }
         }
 
