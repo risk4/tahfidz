@@ -379,6 +379,46 @@ export interface CertificateVerifyResponse {
   };
 }
 
+export interface AppVersionInfo {
+  branch: string;
+  commit_hash: string;
+  commit_short: string;
+  subject: string;
+  author_name?: string | null;
+  commit_date?: string | null;
+}
+
+export interface PendingCommit {
+  sha_short: string;
+  subject: string;
+  author_name?: string | null;
+  date?: string | null;
+}
+
+export interface UpdateCheckResult {
+  up_to_date: boolean;
+  error?: string | null;
+  current: AppVersionInfo | null;
+  remote: { branch: string; commit_hash: string } | null;
+  behind: number;
+  pending_commits: PendingCommit[];
+  dirty_files: number;
+}
+
+export type UpdateStreamEvent =
+  | { type: 'step'; key: string; label: string }
+  | { type: 'output'; line: string }
+  | { type: 'done'; success: boolean; message?: string };
+
+export interface UpdateStatusInfo {
+  running: boolean;
+  last_run: {
+    status: 'success' | 'failed';
+    finished_at: string | null;
+    message: string | null;
+  } | null;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   current_page: number;

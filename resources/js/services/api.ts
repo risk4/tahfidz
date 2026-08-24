@@ -20,6 +20,9 @@ import type {
   TeacherPerformancePoint,
   TeacherPerformanceRange,
   TeacherStats,
+  UpdateCheckResult,
+  UpdateStatusInfo,
+  UpdateStreamEvent,
   User,
   LoginResponse,
   UsersResponse,
@@ -742,6 +745,65 @@ export const certificateService = {
   async verify(code: string): Promise<CertificateVerifyResponse> {
     const response = await axios.get(`/api/certificates/verify/${encodeURIComponent(code)}`);
     return response.data;
+  },
+};
+
+export const updateService = {
+  /** Bandingkan versi aplikasi yang berjalan dengan branch di GitHub. */
+  async check(): Promise<UpdateCheckResult> {
+    const response = await api.get<UpdateCheckResult>('/settings/update/check');
+    return response.data;
+  },
+
+  /** Status proses pembaruan terakhir. */
+  async status(): Promise<UpdateStatusInfo> {
+    const response = await api.get<UpdateStatusInfo>('/settings/update/status');
+    return response.data;
+  },
+
+  /**
+   * Jalankan pembaruan dengan membaca stream NDJSON secara realtime:
+   * setiap baris berupa event {type: step|output|done}.
+   */
+  async run(onEvent: (event: UpdateStreamEvent) => void): Promise<void> {
+    const token = localStorage.getItem('token');
+    const response = await fetch('/api/settings/update/run', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/x-ndjson' },
+    });
+
+    if (!response.ok || !response.body) {
+      let message = 'Gagal memulai pembaruan.';
+      try {
+        message = (await response.json()).message ?? message;
+      } catch {
+        /* respons bukan JSON */
+      }
+      throw new Error(message);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n');
+      buffer = parts.pop() ?? '';
+
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        try {
+          onEvent(JSON.parse(trimmed) as UpdateStreamEvent);
+        } catch {
+          /* baris tidak valid — abaikan */
+        }
+      }
+    }
   },
 };
 

@@ -6,16 +6,16 @@ use App\Http\Controllers\Api\Master\AcademicYearController;
 use App\Http\Controllers\Api\Master\ClassRoomController;
 use App\Http\Controllers\Api\Master\StudentController;
 use App\Http\Controllers\Api\Master\TahfidzGroupController;
+use App\Http\Controllers\Api\Master\TeacherController;
+use App\Http\Controllers\Api\Notifications\NotificationController;
 use App\Http\Controllers\Api\Quran\QuranController;
+use App\Http\Controllers\Api\Settings\SettingsController;
+use App\Http\Controllers\Api\Settings\UpdateController;
 use App\Http\Controllers\Api\Tahfidz\CertificateController;
 use App\Http\Controllers\Api\Tahfidz\MurajaahController;
 use App\Http\Controllers\Api\Tahfidz\ProgressController;
 use App\Http\Controllers\Api\Tahfidz\RecitationCheckController;
 use App\Http\Controllers\Api\Tahfidz\SubmissionController;
-
-use App\Http\Controllers\Api\Master\TeacherController;
-use App\Http\Controllers\Api\Notifications\NotificationController;
-use App\Http\Controllers\Api\Settings\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 // ===== PUBLIC — tidak memerlukan autentikasi =====
@@ -128,7 +128,12 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::get('/settings/backup/download', [SettingsController::class, 'downloadBackup']);
     Route::post('/settings/backup/restore', [SettingsController::class, 'restoreBackup']);
 
+    // ===== UPDATE APLIKASI (cek & terapkan update dari GitHub) =====
+    // Harus didaftarkan sebelum PUT /settings/{group} agar tidak tertukar.
+    Route::get('/settings/update/status', [UpdateController::class, 'status']);
+    Route::get('/settings/update/check', [UpdateController::class, 'check'])->middleware('throttle:20,1');
+    Route::post('/settings/update/run', [UpdateController::class, 'run'])->middleware('throttle:5,1');
+
     // Endpoint quran/submissions/murajaah/progress/reports akan ditambahkan
     // di STEP 3 dan STEP 4/5 sesuai rencana bertahap — belum di file ini.
 });
-

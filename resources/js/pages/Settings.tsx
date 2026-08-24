@@ -60,6 +60,7 @@ import {
   settingsService,
   tahfidzGroupService,
   teacherService,
+  updateService,
   type SettingsGroup,
 } from '@/services/api';
 import type {
@@ -73,6 +74,7 @@ import type {
   SettingsUser,
   TahfidzGroup,
   Teacher,
+  UpdateCheckResult,
 } from '@/types';
 import { formatDate, toDateInputValue } from '@/utils/date';
 
@@ -120,6 +122,7 @@ function actionLabel(action: string): string {
     backup_now: 'Melakukan backup',
     download_backup: 'Mengunduh backup',
     restore_backup: 'Memulihkan backup',
+    update_application: 'Memperbarui aplikasi',
     clear_activity_logs: 'Menghapus log aktivitas',
     create: 'Menambahkan data',
     update: 'Memperbarui data',
@@ -2805,6 +2808,255 @@ function LogsSection() {
 }
 
 /* ============================================================
+ * Pembaruan Aplikasi (Cek Update dari GitHub)
+ * ============================================================ */
+
+function UpdateSection() {
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<UpdateCheckResult | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [currentStep, setCurrentStep] = useState<string | null>(null);
+  const [lines, setLines] = useState<string[]>([]);
+  const [doneInfo, setDoneInfo] = useState<{ success: boolean; message?: string } | null>(null);
+  const [toast, setToast] = useState<{ msg: string; tone: 'success' | 'error' } | null>(null);
+  const logBoxRef = useRef<HTMLDivElement>(null);
+
+  const { data: lastStatus } = useQuery({
+    queryKey: ['update-status'],
+    queryFn: () => updateService.status(),
+    staleTime: 30_000,
+  });
+
+  // Auto-scroll kotak log mengikuti keluaran terbaru.
+  useEffect(() => {
+    const el = logBoxRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [lines, currentStep]);
+
+  // Setelah sukses, bundle JS/aset berubah — muat ulang aplikasi otomatis.
+  useEffect(() => {
+    if (doneInfo?.success) {
+      const t = setTimeout(() => window.location.reload(), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [doneInfo]);
+
+  const runCheck = async () => {
+    setChecking(true);
+    try {
+      const r = await updateService.check();
+      setResult(r);
+    } catch {
+      setToast({ msg: 'Gagal memeriksa pembaruan.', tone: 'error' });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const startUpdate = async () => {
+    setConfirmOpen(false);
+    setUpdating(true);
+    setCurrentStep(null);
+    setLines([]);
+    setDoneInfo(null);
+
+    try {
+      await updateService.run((ev) => {
+        if (ev.type === 'step') {
+          setCurrentStep(ev.label);
+          setLines((prev) => [...prev, `▸ ${ev.label}`]);
+        } else if (ev.type === 'output') {
+          setLines((prev) => [...prev, ev.line]);
+        } else {
+          setCurrentStep(null);
+          setDoneInfo({ success: ev.success, message: ev.message });
+        }
+      });
+    } catch (e) {
+      setDoneInfo({
+        success: false,
+        message: e instanceof Error ? e.message : 'Koneksi terputus saat proses pembaruan.',
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const current = result?.current;
+
+  return (
+    <div className="space-y-5">
+      {toast && <Toast msg={toast.msg} tone={toast.tone} onClose={() => setToast(null)} />}
+      <SectionHeader title="Pembaruan Aplikasi" subtitle="Periksa & terapkan update dari GitHub tanpa terminal" />
+
+      {/* Versi saat ini */}
+      <Card>
+        <CardContent className="space-y-4 p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Versi Saat Ini</p>
+              {current ? (
+                <>
+                  <p className="mt-1 font-mono text-sm font-bold text-slate-900">
+                    {current.branch} · {current.commit_short}
+                  </p>
+                  <p className="truncate text-sm text-slate-600">{current.subject}</p>
+                  <p className="text-xs text-slate-400">
+                    {fmtDateTime(current.commit_date)}
+                    {current.author_name ? ` · ${current.author_name}` : ''}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-sm text-slate-500">Informasi versi belum tersedia — jalankan pemeriksaan.</p>
+              )}
+            </div>
+            <Button onClick={runCheck} disabled={checking || updating}>
+              <RefreshCw className={`h-4 w-4 ${checking ? 'animate-spin' : ''}`} />
+              {checking ? 'Memeriksa...' : 'Cek Pembaruan'}
+            </Button>
+          </div>
+
+          {result?.error && (
+            <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">{result.error}</div>
+          )}
+
+          {!result?.error && result?.up_to_date && (
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              Aplikasi sudah berada pada versi terbaru.
+            </div>
+          )}
+
+          {/* Daftar commit baru yang tersedia */}
+          {!result?.error && result && !result.up_to_date && result.pending_commits.length > 0 && (
+            <div className="space-y-3 rounded-xl border border-amber-100 bg-amber-50 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-amber-800">{result.behind} commit baru tersedia</p>
+                <Button size="sm" onClick={() => setConfirmOpen(true)} disabled={updating}>
+                  <Download className="h-4 w-4" /> Terapkan Pembaruan
+                </Button>
+              </div>
+
+              {result.dirty_files > 0 && (
+                <p className="flex items-start gap-1.5 text-xs text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  {result.dirty_files} file lokal berubah — perubahan tersebut akan ditimpa saat pembaruan.
+                </p>
+              )}
+
+              <div className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
+                {result.pending_commits.map((c) => (
+                  <div key={c.sha_short} className="flex items-start gap-2 text-xs">
+                    <span className="shrink-0 rounded bg-white px-1.5 py-0.5 font-mono font-bold text-slate-700">
+                      {c.sha_short}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-slate-700" title={c.subject}>
+                      {c.subject}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-slate-400">{c.author_name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Catatan hasil pembaruan terakhir */}
+          {lastStatus?.last_run?.status === 'failed' && !updating && !doneInfo && (
+            <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+              Pembaruan terakhir ({fmtDateTime(lastStatus.last_run.finished_at)}) gagal:{' '}
+              {lastStatus.last_run.message ?? '-'}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Log pembaruan live */}
+      {(updating || doneInfo) && (
+        <Card>
+          <CardContent className="space-y-3 p-6">
+            <div className="flex items-center gap-2">
+              {updating ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-emerald-600" />
+              ) : doneInfo?.success ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
+              )}
+              <p className="text-sm font-bold text-slate-900">
+                {updating
+                  ? currentStep || 'Menjalankan pembaruan...'
+                  : doneInfo?.success
+                    ? 'Pembaruan berhasil'
+                    : 'Pembaruan gagal'}
+              </p>
+            </div>
+
+            {updating && (
+              <p className="text-xs text-slate-400">Jangan tutup halaman ini sampai proses selesai.</p>
+            )}
+
+            <div
+              ref={logBoxRef}
+              className="h-72 overflow-y-auto rounded-xl bg-slate-900 p-4 font-mono text-xs leading-relaxed text-emerald-300"
+            >
+              {lines.map((line, i) => (
+                <div
+                  key={i}
+                  className={
+                    line.startsWith('[ERROR]')
+                      ? 'text-rose-400'
+                      : line.startsWith('[WARN]') || line.startsWith('[SKIP]')
+                        ? 'text-amber-300'
+                        : line.startsWith('▸')
+                          ? 'font-bold text-white'
+                          : ''
+                  }
+                >
+                  {line}
+                </div>
+              ))}
+            </div>
+
+            {doneInfo && (
+              <p className={`text-sm font-medium ${doneInfo.success ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {doneInfo.message}
+                {doneInfo.success && ' Memuat ulang aplikasi otomatis...'}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Konfirmasi */}
+      {confirmOpen && (
+        <Modal title="Konfirmasi Pembaruan" onClose={() => setConfirmOpen(false)} maxWidth="max-w-md">
+          <div className="space-y-4 p-6">
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="space-y-1">
+                <p>Aplikasi akan diperbarui sebanyak {result?.behind} commit.</p>
+                <ul className="list-disc space-y-0.5 pl-4 text-xs leading-relaxed">
+                  <li>Perubahan file lokal yang belum di-commit akan ditimpa.</li>
+                  <li>Aplikasi tidak dapat diakses sesaat selama proses berlangsung.</li>
+                  <li>Pastikan backup database telah dilakukan sebelum melanjutkan.</li>
+                </ul>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+                Batal
+              </Button>
+              <Button onClick={startUpdate}>Ya, Perbarui Sekarang</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
  * Halaman utama
  * ============================================================ */
 
@@ -2820,6 +3072,7 @@ type SectionId =
   | 'notifications'
   | 'recitation'
   | 'backup'
+  | 'update'
   | 'security'
   | 'integrations'
   | 'logs';
@@ -2836,6 +3089,7 @@ const sections: { id: SectionId; label: string; icon: LucideIcon }[] = [
   { id: 'notifications', label: 'Notifikasi', icon: Bell },
   { id: 'recitation', label: 'Pengecekan Bacaan', icon: Mic },
   { id: 'backup', label: 'Backup Data', icon: Database },
+  { id: 'update', label: 'Pembaruan Aplikasi', icon: RefreshCw },
   { id: 'security', label: 'Keamanan', icon: ShieldCheck },
   { id: 'integrations', label: 'Integrasi', icon: Plug },
   { id: 'logs', label: 'Log Aktivitas', icon: History },
@@ -2873,6 +3127,8 @@ export default function Settings() {
         return <RecitationSection />;
       case 'backup':
         return <BackupSection />;
+      case 'update':
+        return <UpdateSection />;
       case 'security':
         return <SecuritySection />;
       case 'integrations':
