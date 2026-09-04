@@ -270,12 +270,8 @@ class SettingsService
         $cutoff = now()->subDays(max(1, $retentionDays));
         $deleted = 0;
 
-        foreach (Storage::disk('local')->files('backups') as $path) {
-            if (! preg_match('/^backups\/settings-(\d{8}_\d{6})\.json$/', $path, $matches)) {
-                continue;
-            }
-
-            $createdAt = Carbon::createFromFormat('Ymd_His', $matches[1]);
+        foreach ($this->validBackupFiles() as $path) {
+            $createdAt = $this->backupDate($path);
             if ($createdAt && $createdAt->lt($cutoff) && Storage::disk('local')->delete($path)) {
                 $deleted++;
             }
@@ -291,10 +287,7 @@ class SettingsService
      */
     public function latestBackupFilename(): ?string
     {
-        $backups = array_values(array_filter(
-            Storage::disk('local')->files('backups'),
-            fn (string $path) => preg_match('/^backups\/settings-\d{8}_\d{6}\.json$/', $path) === 1
-        ));
+        $backups = $this->validBackupFiles();
 
         if (empty($backups)) {
             return null;
@@ -303,6 +296,61 @@ class SettingsService
         sort($backups);
 
         return end($backups);
+    }
+
+    /**
+     * Daftar seluruh file backup beserta metadata (tanggal & ukuran),
+     * diurutkan dari yang terbaru ke terlama.
+     *
+     * @return array<int, array{filename: string, date: string, size: string, latest: bool}>
+     */
+    public function backups(): array
+    {
+        $files = $this->validBackupFiles();
+        if (empty($files)) {
+            return [];
+        }
+
+        rsort($files); // nama memakai timestamp Ymd_His => terbaru paling dulu
+
+        $latest = $files[0];
+
+        return collect($files)->map(fn (string $path) => [
+            'filename' => $path,
+            'date' => $this->backupDate($path)?->toDateTimeString(),
+            'size' => $this->humanFileSize(Storage::disk('local')->size($path)),
+            'latest' => $path === $latest,
+        ])->values()->all();
+    }
+
+    /**
+     * Validasi bahwa sebuah nama file adalah file backup konfigurasi milik
+     * aplikasi (mencegah path traversal / nama file bebas saat download).
+     */
+    public function isValidBackupFile(?string $filename): bool
+    {
+        return $filename !== null
+            && preg_match('/^backups\/settings-\d{8}_\d{6}\.json$/', $filename) === 1
+            && Storage::disk('local')->exists($filename);
+    }
+
+    /** Seluruh nama file backup yang valid di disk, tanpa urutan tertentu. */
+    private function validBackupFiles(): array
+    {
+        return array_values(array_filter(
+            Storage::disk('local')->files('backups'),
+            fn (string $path) => preg_match('/^backups\/settings-\d{8}_\d{6}\.json$/', $path) === 1
+        ));
+    }
+
+    /** Baca timestamp dari nama file backup, atau null bila tidak cocok. */
+    private function backupDate(string $path): ?Carbon
+    {
+        if (preg_match('/^backups\/settings-(\d{8}_\d{6})\.json$/', $path, $matches) !== 1) {
+            return null;
+        }
+
+        return Carbon::createFromFormat('Ymd_His', $matches[1]);
     }
 
     /**

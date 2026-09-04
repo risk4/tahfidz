@@ -3,11 +3,15 @@ import axios from 'axios';
 import type {
   ActivityLog,
   AppSettings,
+  BackupFile,
   Certificate,
   CertificateStats,
   CertificateVerifyResponse,
   DashboardOverview,
   DashboardRange,
+  DataCaptcha,
+  DataCounts,
+  DataWipeResult,
   EligibleStudent,
   MemorizationStatus,
   NotificationListResponse,
@@ -894,22 +898,38 @@ export const settingsService = {
     return response.data;
   },
 
-  /** Unduh file backup konfigurasi terbaru sebagai JSON. */
-  async downloadBackup(): Promise<void> {
+  /** Unduh file backup (default: terbaru; atau lewat parameter filename). */
+  async downloadBackup(filename?: string): Promise<void> {
     const token = localStorage.getItem('token');
-    const response = await fetch('/api/settings/backup/download', {
+    const url = filename
+      ? `/api/settings/backup/download?filename=${encodeURIComponent(filename)}`
+      : '/api/settings/backup/download';
+    const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) throw new Error('Gagal mengunduh backup.');
     const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
+    const urlObject = URL.createObjectURL(blob);
+
+    // Ambil nama file asli dari header content-disposition bila tersedia.
+    const disposition = response.headers.get('content-disposition') ?? '';
+    const match = disposition.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+    const fallbackName = filename ? filename.split('/').pop() ?? 'backup.json' : 'backup_pengaturan.json';
+    const downloadName = decodeURIComponent((match?.[1] ?? fallbackName).replace(/"/g, '').trim());
+
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `backup_pengaturan_${new Date().toISOString().slice(0, 10)}.json`;
+    a.href = urlObject;
+    a.download = downloadName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(urlObject);
+  },
+
+  /** Daftar seluruh file backup, dari terbaru ke terlama. */
+  async backupFiles(): Promise<BackupFile[]> {
+    const response = await api.get<BackupFile[]>('/settings/backup/files');
+    return response.data;
   },
 
   async restoreBackup(file: File): Promise<{ message: string }> {
@@ -923,6 +943,30 @@ export const settingsService = {
 
   async testEmail(to?: string): Promise<{ status: 'sent' | 'failed'; message: string }> {
     const response = await api.post('/settings/test-email', { to });
+    return response.data;
+  },
+};
+
+export const dataService = {
+  /** Ringkasan jumlah data yang akan dihapus. */
+  async counts(): Promise<DataCounts> {
+    const response = await api.get<DataCounts>('/settings/data/count');
+    return response.data;
+  },
+
+  /** Buat challenge captcha (soal aritmetika) untuk konfirmasi penghapusan. */
+  async captcha(): Promise<DataCaptcha> {
+    const response = await api.get<DataCaptcha>('/settings/data/captcha');
+    return response.data;
+  },
+
+  /** Hapus seluruh data setelah captcha lolos. */
+  async wipe(token: string, answer: string): Promise<DataWipeResult> {
+    const response = await api.post<DataWipeResult>('/settings/data/wipe', {
+      token,
+      answer,
+      confirm: 'HAPUS',
+    });
     return response.data;
   },
 };

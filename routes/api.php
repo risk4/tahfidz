@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Master\TahfidzGroupController;
 use App\Http\Controllers\Api\Master\TeacherController;
 use App\Http\Controllers\Api\Notifications\NotificationController;
 use App\Http\Controllers\Api\Quran\QuranController;
+use App\Http\Controllers\Api\Settings\DataController;
 use App\Http\Controllers\Api\Settings\SettingsController;
 use App\Http\Controllers\Api\Settings\UpdateController;
 use App\Http\Controllers\Api\Tahfidz\CertificateController;
@@ -125,8 +126,14 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::delete('/settings/sessions/{tokenId}', [SettingsController::class, 'revokeSession']);
     Route::post('/settings/logout-all', [SettingsController::class, 'logoutAll']);
     Route::post('/settings/backup', [SettingsController::class, 'backupNow']);
+    Route::get('/settings/backup/files', [SettingsController::class, 'backupFiles']);
     Route::get('/settings/backup/download', [SettingsController::class, 'downloadBackup']);
     Route::post('/settings/backup/restore', [SettingsController::class, 'restoreBackup']);
+
+    // ===== HAPUS DATA (reset seluruh data — khusus super admin via policy) =====
+    Route::get('/settings/data/count', [DataController::class, 'counts']);
+    Route::get('/settings/data/captcha', [DataController::class, 'captcha'])->middleware('throttle:10,1');
+    Route::post('/settings/data/wipe', [DataController::class, 'wipe'])->middleware('throttle:5,1');
 
     // ===== UPDATE APLIKASI (cek & terapkan update dari GitHub) =====
     // Harus didaftarkan sebelum PUT /settings/{group} agar tidak tertukar.

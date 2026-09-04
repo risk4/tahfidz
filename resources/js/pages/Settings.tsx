@@ -56,6 +56,7 @@ import ManageMembersModal from '@/components/tahfidz/ManageMembersModal';
 import {
   academicYearService,
   classService,
+  dataService,
   quranService,
   settingsService,
   tahfidzGroupService,
@@ -68,6 +69,8 @@ import type {
   ActivityLog,
   AppSettings,
   ClassRoom,
+  DataCaptcha,
+  DataCounts,
   MurajaahMethod,
   QuranSurah,
   SessionInfo,
@@ -2026,11 +2029,16 @@ function BackupSection() {
   const values = form ?? base;
   const [saving, setSaving] = useState(false);
   const [backing, setBacking] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [downloading, setDownloading] = useState<boolean | string>(false);
   const [restoring, setRestoring] = useState(false);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<{ msg: string; tone: 'success' | 'error' } | null>(null);
+
+  const { data: backupFiles, isLoading: filesLoading } = useQuery({
+    queryKey: ['backup-files'],
+    queryFn: () => settingsService.backupFiles(),
+  });
 
   useEffect(() => {
     if (!form && base) setForm({ ...base });
@@ -2060,6 +2068,7 @@ function BackupSection() {
       queryClient.setQueryData(['settings'], (old: AppSettings | undefined) =>
         old ? { ...old, backup: res.values } : old
       );
+      queryClient.invalidateQueries({ queryKey: ['backup-files'] });
       setToast({ msg: 'Backup konfigurasi berhasil dibuat.', tone: 'success' });
     } catch {
       setToast({ msg: 'Gagal membuat backup.', tone: 'error' });
@@ -2068,10 +2077,10 @@ function BackupSection() {
     }
   };
 
-  const downloadBackup = async () => {
-    setDownloading(true);
+  const downloadBackup = async (filename?: string) => {
+    setDownloading(filename ?? true);
     try {
-      await settingsService.downloadBackup();
+      await settingsService.downloadBackup(filename);
       setToast({ msg: 'Backup berhasil diunduh.', tone: 'success' });
     } catch {
       setToast({ msg: 'Belum ada backup yang dapat diunduh. Buat backup terlebih dahulu.', tone: 'error' });
@@ -2095,6 +2104,8 @@ function BackupSection() {
     }
   };
 
+  const files = backupFiles ?? [];
+
   return (
     <div className="space-y-5">
       {toast && <Toast msg={toast.msg} tone={toast.tone} onClose={() => setToast(null)} />}
@@ -2102,26 +2113,28 @@ function BackupSection() {
 
       <Card>
         <CardContent className="space-y-4 p-6">
+          {/* Info backup terakhir — dibaca langsung dari data server (base),
+              bukan dari draft form, agar selalu segar setelah backup. */}
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-slate-100 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Backup Terakhir</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{fmtDateTime(values?.last_backup_at)}</p>
-              <p className="text-xs text-slate-500">{values?.last_backup_size || '-'}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">{fmtDateTime(base?.last_backup_at)}</p>
+              <p className="text-xs text-slate-500">{base?.last_backup_size || '-'}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Status</p>
               <span
                 className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                  values?.last_backup_status === 'success'
+                  base?.last_backup_status === 'success'
                     ? 'bg-emerald-100 text-emerald-700'
-                    : values?.last_backup_status
+                    : base?.last_backup_status
                       ? 'bg-rose-100 text-rose-700'
                       : 'bg-slate-100 text-slate-600'
                 }`}
               >
-                {values?.last_backup_status === 'success'
+                {base?.last_backup_status === 'success'
                   ? 'Berhasil'
-                  : values?.last_backup_status === 'failed'
+                  : base?.last_backup_status === 'failed'
                     ? 'Gagal'
                     : 'Belum pernah'}
               </span>
@@ -2188,9 +2201,9 @@ function BackupSection() {
                 e.target.value = '';
               }}
             />
-            <Button variant="outline" onClick={downloadBackup} disabled={downloading}>
-              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              Download Backup
+            <Button variant="outline" onClick={() => downloadBackup()} disabled={downloading !== false}>
+              {downloading !== false ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Download Terbaru
             </Button>
             <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={restoring}>
               {restoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -2201,6 +2214,62 @@ function BackupSection() {
             Backup menyimpan snapshot konfigurasi aplikasi (JSON) ke storage lokal — data santri & setoran tidak ikut
             diubah.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Daftar file backup yang dapat diunduh per tanggal */}
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Riwayat Backup</CardTitle>
+          <CardDescription>
+            File backup yang tersimpan — pilih dan unduh sesuai tanggal yang diinginkan.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {filesLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin" /> Memuat...
+            </div>
+          ) : files.length === 0 ? (
+            <div className="py-10 text-center text-sm text-slate-500">
+              Belum ada file backup. Klik <b>Backup Sekarang</b> untuk membuat yang pertama.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {files.map((f) => (
+                <div key={f.filename} className="flex items-center gap-3 py-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <FileText className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-900">
+                      {f.date ? fmtDateTime(f.date) : f.filename}
+                      {f.latest && (
+                        <span className="ml-2 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                          Terbaru
+                        </span>
+                      )}
+                    </p>
+                    <p className="truncate font-mono text-xs text-slate-400">{f.filename.replace('backups/', '')}</p>
+                  </div>
+                  <span className="shrink-0 text-xs text-slate-500">{f.size}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={downloading === f.filename}
+                    onClick={() => downloadBackup(f.filename)}
+                  >
+                    {downloading === f.filename ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    Unduh
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -2808,6 +2877,233 @@ function LogsSection() {
 }
 
 /* ============================================================
+ * Hapus Data (reset seluruh data)
+ * ============================================================ */
+
+const dataLabel: Record<keyof DataCounts, string> = {
+  teachers: 'Guru / Pembimbing',
+  students: 'Siswa / Santri',
+  submissions: 'Setoran Hafalan',
+  murajaahs: 'Murajaah',
+  certificates: 'Sertifikat',
+  recitations: 'Pengecekan Bacaan',
+  users: 'Akun Login (Guru & Siswa)',
+};
+
+function DataSection() {
+  const queryClient = useQueryClient();
+  const { data: counts } = useQuery({
+    queryKey: ['data-counts'],
+    queryFn: () => dataService.counts(),
+    staleTime: 15_000,
+  });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; tone: 'success' | 'error' } | null>(null);
+  const [captchaInput, setCaptchaInput] = useState('');
+  const [captcha, setCaptcha] = useState<DataCaptcha | null>(null);
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [wiping, setWiping] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadCaptcha = useCallback(async () => {
+    setCaptchaLoading(true);
+    setCaptchaInput('');
+    setError('');
+    try {
+      const c = await dataService.captcha();
+      setCaptcha(c);
+    } catch {
+      setCaptcha(null);
+      setError('Gagal memuat verifikasi keamanan. Muat ulang dan coba lagi.');
+    } finally {
+      setCaptchaLoading(false);
+    }
+  }, []);
+
+  const openConfirm = async () => {
+    setError('');
+    setConfirmText('');
+    setConfirmOpen(true);
+    await loadCaptcha();
+  };
+
+  const submitWipe = async () => {
+    if (confirmText.trim() !== 'HAPUS') {
+      setError('Ketikkan HAPUS (huruf kapital) untuk melanjutkan.');
+      return;
+    }
+    if (!captcha) {
+      setError('Verifikasi keamanan belum dimuat. Muat ulang soal.');
+      return;
+    }
+    setWiping(true);
+    setError('');
+    try {
+      const result = await dataService.wipe(captcha.token, captchaInput.trim());
+      setConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['data-counts'] });
+      setToast({
+        msg: `${result.message} ${result.counts.students} santri & ${result.counts.teachers} guru dihapus.`,
+        tone: 'success',
+      });
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : 'Gagal menghapus data. Periksa jawaban captcha dan coba lagi.';
+      setError(message);
+      // Token captcha sudah dipakai (dikonsumsi) oleh backend — muat soal baru.
+      await loadCaptcha();
+    } finally {
+      setWiping(false);
+    }
+  };
+
+  const total = counts
+    ? counts.teachers +
+      counts.students +
+      counts.submissions +
+      counts.murajaahs +
+      counts.certificates +
+      counts.recitations +
+      counts.users
+    : 0;
+
+  return (
+    <div className="space-y-5">
+      {toast && <Toast msg={toast.msg} tone={toast.tone} onClose={() => setToast(null)} />}
+      <SectionHeader title="Hapus Data" subtitle="Reset seluruh data operasional lembaga" />
+
+      <Card className="border-rose-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-rose-700">
+            <AlertTriangle className="h-5 w-5" /> Zona Berbahaya
+          </CardTitle>
+          <CardDescription>
+            Menghapus seluruh data <b>guru, siswa, setoran & murajaah, progress hafalan, dan
+            sertifikat</b> beserta akun login milik mereka. Tindakan ini permanen dan tidak dapat
+            dibatalkan.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {counts && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {(Object.keys(dataLabel) as (keyof DataCounts)[]).map((k) => (
+                <div key={k} className="rounded-xl border border-slate-100 p-4">
+                  <p className="text-2xl font-bold text-slate-900">{counts[k].toLocaleString('id-ID')}</p>
+                  <p className="text-xs text-slate-500">{dataLabel[k]}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="border-t border-slate-100 pt-4">
+            {total === 0 ? (
+              <p className="text-sm text-slate-500">Belum ada data operasional yang perlu dihapus.</p>
+            ) : (
+              <Button
+                variant="destructive"
+                className="bg-rose-600 hover:bg-rose-700"
+                onClick={openConfirm}
+              >
+                <Trash2 className="h-4 w-4" /> Hapus Semua Data ({total.toLocaleString('id-ID')})
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Konfirmasi + Captcha */}
+      {confirmOpen && (
+        <Modal title="Konfirmasi Hapus Data" onClose={() => setConfirmOpen(false)} maxWidth="max-w-lg">
+          <div className="space-y-4 p-6">
+            <div className="flex items-start gap-3 rounded-xl border border-rose-100 bg-rose-50 p-4">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+              <div className="space-y-1 text-sm text-rose-800">
+                <p className="font-bold">Tindakan permanen — tidak dapat dibatalkan!</p>
+                <ul className="list-disc space-y-0.5 pl-4 text-xs leading-relaxed">
+                  <li>Semua data guru, siswa, setoran, murajaah, progress, dan sertifikat akan dihapus.</li>
+                  <li>Akun login milik guru & siswa ikut dihapus. Akun admin Anda tetap aman.</li>
+                  <li>Pengaturan aplikasi, kelas, halaqah, dan data referensi Qur'an tidak dihapus.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="wipe-confirm">
+                Ketik <span className="font-mono font-bold">HAPUS</span> untuk mengonfirmasi
+              </Label>
+              <Input
+                id="wipe-confirm"
+                value={confirmText}
+                onChange={(e) => {
+                  setConfirmText(e.target.value);
+                  setError('');
+                }}
+                placeholder="HAPUS"
+                autoComplete="off"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="wipe-captcha">Selesaikan verifikasi keamanan</Label>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                  {captchaLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                  ) : (
+                    <KeyRound className="h-4 w-4 text-slate-500" />
+                  )}
+                  <span className="text-sm font-medium text-slate-700">
+                    {captchaLoading ? 'Memuat soal...' : captcha?.question ?? 'Soal tidak tersedia'}
+                  </span>
+                  <button
+                    type="button"
+                    className="ml-auto text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                    disabled={captchaLoading || wiping}
+                    onClick={loadCaptcha}
+                  >
+                    Muat Ulang
+                  </button>
+                </div>
+                <Input
+                  id="wipe-captcha"
+                  inputMode="numeric"
+                  value={captchaInput}
+                  disabled={captchaLoading || wiping}
+                  onChange={(e) => {
+                    setCaptchaInput(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="Jawaban"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+
+            {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" disabled={wiping} onClick={() => setConfirmOpen(false)}>
+                Batal
+              </Button>
+              <Button
+                variant="destructive"
+                className="bg-rose-600 hover:bg-rose-700"
+                disabled={wiping || confirmText.trim() !== 'HAPUS' || captchaInput.trim() === '' || !captcha}
+                onClick={submitWipe}
+              >
+                {wiping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {wiping ? 'Menghapus...' : 'Hapus Semua Data Sekarang'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
  * Pembaruan Aplikasi (Cek Update dari GitHub)
  * ============================================================ */
 
@@ -3081,6 +3377,7 @@ type SectionId =
   | 'notifications'
   | 'recitation'
   | 'backup'
+  | 'data'
   | 'update'
   | 'security'
   | 'integrations'
@@ -3098,6 +3395,7 @@ const sections: { id: SectionId; label: string; icon: LucideIcon }[] = [
   { id: 'notifications', label: 'Notifikasi', icon: Bell },
   { id: 'recitation', label: 'Pengecekan Bacaan', icon: Mic },
   { id: 'backup', label: 'Backup Data', icon: Database },
+  { id: 'data', label: 'Hapus Data', icon: Trash2 },
   { id: 'update', label: 'Pembaruan Aplikasi', icon: RefreshCw },
   { id: 'security', label: 'Keamanan', icon: ShieldCheck },
   { id: 'integrations', label: 'Integrasi', icon: Plug },
@@ -3136,6 +3434,8 @@ export default function Settings() {
         return <RecitationSection />;
       case 'backup':
         return <BackupSection />;
+      case 'data':
+        return <DataSection />;
       case 'update':
         return <UpdateSection />;
       case 'security':

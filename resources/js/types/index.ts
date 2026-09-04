@@ -525,6 +525,35 @@ export interface SettingsUser extends User {
   student?: { id: number; name: string } | null;
 }
 
+/** Ringkasan data yang akan dihapus oleh fitur "Hapus Data". */
+export interface DataCounts {
+  teachers: number;
+  students: number;
+  submissions: number;
+  murajaahs: number;
+  certificates: number;
+  recitations: number;
+  users: number;
+}
+
+export interface DataCaptcha {
+  token: string;
+  question: string;
+}
+
+export interface DataWipeResult {
+  message: string;
+  counts: DataCounts;
+}
+
+/** Sebuah file backup konfigurasi yang tersimpan di storage. */
+export interface BackupFile {
+  filename: string;
+  date: string | null;
+  size: string;
+  latest: boolean;
+}
+
 export interface UsersResponse {
   users: PaginatedResponse<SettingsUser>;
   role_counts: Record<string, number>;

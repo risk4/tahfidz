@@ -49,8 +49,8 @@ class SettingsController extends Controller
         $application = $this->settings->group('application');
 
         return response()->json([
-            'app_name'     => $application['app_name'] ?? $profile['name'] ?? null,
-            'logo_path'    => $application['logo_path'] ?? $profile['logo_path'] ?? null,
+            'app_name' => $application['app_name'] ?? $profile['name'] ?? null,
+            'logo_path' => $application['logo_path'] ?? $profile['logo_path'] ?? null,
             'favicon_path' => $application['favicon_path'] ?? null,
         ]);
     }
@@ -255,20 +255,34 @@ class SettingsController extends Controller
         return response()->json(['group' => 'backup', 'values' => $backup]);
     }
 
-    /** GET /api/settings/backup/download — unduh file backup terbaru. */
+    /** GET /api/settings/backup/download — unduh file backup (terbaru bila tidak disebutkan). */
     public function downloadBackup(Request $request)
     {
         $this->authorize('update', AppSetting::class);
 
-        $filename = $this->settings->latestBackupFilename();
+        // Ambil file backup yang diminta (bisa lewat parameter `filename`);
+        // default ke file terbaru bila tidak disebutkan.
+        $filename = $request->query('filename') ?: $this->settings->latestBackupFilename();
 
         if (! $filename) {
             return response()->json(['message' => 'Belum ada backup yang dapat diunduh.'], 404);
         }
 
+        if (! $this->settings->isValidBackupFile($filename)) {
+            return response()->json(['message' => 'File backup tidak valid.'], 404);
+        }
+
         $this->auditLog->record($request->user(), 'download_backup', 'settings', null, $request);
 
         return Storage::disk('local')->download($filename, basename($filename));
+    }
+
+    /** GET /api/settings/backup/files — daftar seluruh file backup per tanggal. */
+    public function backupFiles(Request $request)
+    {
+        $this->authorize('viewAny', AppSetting::class);
+
+        return response()->json($this->settings->backups());
     }
 
     /** POST /api/settings/backup/restore — pulihkan pengaturan dari file backup. */
