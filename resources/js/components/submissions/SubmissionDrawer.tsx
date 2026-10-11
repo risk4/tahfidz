@@ -70,6 +70,18 @@ const METHOD_LABEL: Record<string, string> = {
 
 const photoUrl = (p?: string | null) => (p ? (p.startsWith('/storage/') || p.startsWith('http') ? p : `/storage/${p}`) : '');
 
+function clampAyah(value: unknown, totalAyahs: unknown, fallback = 1): number {
+  const n = Number(value) || fallback;
+  const t = Number(totalAyahs) || 0;
+  return t ? Math.min(Math.max(n, 1), t) : Math.max(n, 1);
+}
+
+function rangeFlags(from: number, to: number): Record<number, boolean> {
+  const flags: Record<number, boolean> = {};
+  for (let n = from; n <= to; n++) flags[n] = true;
+  return flags;
+}
+
 function avatarOption(name: string, photo?: string | null): { avatar: string | null; avatarText: string } {
   return {
     avatar: photoUrl(photo) || null,
@@ -185,6 +197,9 @@ export function SubmissionDrawer({
   }, [studentQuery, searchStudents]);
 
   // React-hook-form
+  const editingSurah = editing ? surahs.find((s) => s.id === editing.surah_id) ?? null : null;
+  const editStartAyah = editing ? clampAyah(editing.start_ayah, editingSurah?.total_ayahs) : 1;
+  const editEndAyah = editing ? Math.max(editStartAyah, clampAyah(editing.end_ayah, editingSurah?.total_ayahs)) : 1;
   const {
     register,
     handleSubmit,
@@ -203,8 +218,8 @@ export function SubmissionDrawer({
           type: editing.type,
           method: editing.method ?? (editing.type === 'repetition' ? 'murojaah' : 'setoran'),
           surah_id: editing.surah_id,
-          start_ayah: editing.start_ayah,
-          end_ayah: editing.end_ayah,
+          start_ayah: editStartAyah,
+          end_ayah: editEndAyah,
           page_count: Number(editing.page_count || 1),
           status: editing.status || 'approved',
           fluency_score: editing.fluency_score || 90,
@@ -246,6 +261,13 @@ export function SubmissionDrawer({
   // Santri / surah terpilih
   const selectedStudent = students.find((s) => s.id === Number(w.student_id)) ?? null;
   const selectedSurah = surahs.find((s) => s.id === Number(w.surah_id)) ?? null;
+
+  const totalAyahs = Math.max(Number(selectedSurah?.total_ayahs ?? 0) || 0, 0);
+  const ayahNumbers = useMemo(
+    () => (totalAyahs > 0 ? Array.from({ length: totalAyahs }, (_, i) => i + 1) : []),
+    [totalAyahs]
+  );
+  const startAyahNum = totalAyahs > 0 ? Math.min(Math.max(Number(w.start_ayah) || 1, 1), totalAyahs) : 1;
 
   // Pembimbing — wali kelas / guru otomatis & terkunci
   const isTeacherLocked = isTeacherRole && !!currentTeacherId;
@@ -500,7 +522,13 @@ export function SubmissionDrawer({
                   options={surahOptions}
                   value={w.surah_id || null}
                   onChange={(v) => {
-                    setValue('surah_id', Number(v) || 0);
+                    const nextId = Number(v) || 0;
+                    const nextTotal = Number(surahs.find((s) => s.id === nextId)?.total_ayahs ?? 0) || 0;
+                    const st = clampAyah(w.start_ayah, nextTotal);
+                    const en = Math.max(st, clampAyah(w.end_ayah, nextTotal, st));
+                    setValue('surah_id', nextId, { shouldDirty: true });
+                    setValue('start_ayah', st, { shouldDirty: true });
+                    setValue('end_ayah', en, { shouldDirty: true });
                     setAyahStatus({});
                   }}
                   placeholder="Pilih surah..."
@@ -513,35 +541,63 @@ export function SubmissionDrawer({
                 <label className="mb-1.5 block text-sm font-medium text-[#172033]">
                   Ayat Mulai <span className="text-rose-500">*</span>
                 </label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={selectedSurah?.total_ayahs ?? 999}
-                  placeholder="Contoh: 1"
-                  className="rounded-xl"
-                  {...register('start_ayah')}
-                />
+                <div className="relative">
+                  <select
+                    aria-label="Ayat mulai"
+                    value={totalAyahs > 0 ? String(w.start_ayah ?? '') : ''}
+                    disabled={totalAyahs < 1}
+                    onChange={(e) => {
+                      const st = clampAyah(e.target.value, totalAyahs);
+                      const en = Math.max(st, clampAyah(w.end_ayah, totalAyahs, st));
+                      setValue('start_ayah', st, { shouldDirty: true });
+                      setValue('end_ayah', en, { shouldDirty: true });
+                      setAyahStatus(rangeFlags(st, en));
+                    }}
+                    className="h-11 w-full appearance-none rounded-xl border border-[#E2E8F0] bg-white px-3 pr-9 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#0D753F]/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-[#94A3B8]"
+                  >
+                    {totalAyahs < 1 ? (
+                      <option value="">Pilih surah terlebih dahulu</option>
+                    ) : (
+                      ayahNumbers.map((n) => (
+                        <option key={n} value={n}>
+                          Ayat {n}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                </div>
                 {errors.start_ayah && <p className="mt-1.5 text-xs text-rose-600">{errors.start_ayah.message}</p>}
-                {Number(w.start_ayah) > (selectedSurah?.total_ayahs ?? 999) && (
-                  <p className="mt-1.5 text-xs text-rose-600">Tidak boleh lebih dari {selectedSurah?.total_ayahs} ayat</p>
-                )}
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-[#172033]">
                   Ayat Selesai <span className="text-rose-500">*</span>
                 </label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={selectedSurah?.total_ayahs ?? 999}
-                  placeholder="Contoh: 10"
-                  className="rounded-xl"
-                  {...register('end_ayah')}
-                />
+                <div className="relative">
+                  <select
+                    aria-label="Ayat selesai"
+                    value={totalAyahs > 0 ? String(w.end_ayah ?? '') : ''}
+                    disabled={totalAyahs < 1}
+                    onChange={(e) => {
+                      const en = Math.min(Math.max(Number(e.target.value) || startAyahNum, startAyahNum), totalAyahs);
+                      setValue('end_ayah', en, { shouldDirty: true });
+                      setAyahStatus(rangeFlags(startAyahNum, en));
+                    }}
+                    className="h-11 w-full appearance-none rounded-xl border border-[#E2E8F0] bg-white px-3 pr-9 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#0D753F]/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-[#94A3B8]"
+                  >
+                    {totalAyahs < 1 ? (
+                      <option value="">Pilih surah terlebih dahulu</option>
+                    ) : (
+                      ayahNumbers.slice(startAyahNum - 1).map((n) => (
+                        <option key={n} value={n}>
+                          Ayat {n}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                </div>
                 {errors.end_ayah && <p className="mt-1.5 text-xs text-rose-600">{errors.end_ayah.message}</p>}
-                {Number(w.end_ayah) > (selectedSurah?.total_ayahs ?? 999) && (
-                  <p className="mt-1.5 text-xs text-rose-600">Ayat melebihi jumlah ayat pada surah yang dipilih</p>
-                )}
               </div>
 
               <div className="md:col-span-2">
