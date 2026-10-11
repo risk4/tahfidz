@@ -31,18 +31,5 @@ class StudentSeeder extends Seeder
 
         $groupA = TahfidzGroup::where('name', 'Tahfidz A')->first();
         $groupA?->members()->attach($student->id, ['joined_at' => now()->toDateString()]);
-
-        // Beberapa siswa dummy tambahan untuk keperluan testing listing/pagination
-        foreach (range(2, 6) as $i) {
-            $s = Student::create([
-                'student_code' => 'ST-000' . $i,
-                'name' => "Siswa Dummy {$i}",
-                'gender' => $i % 2 === 0 ? 'P' : 'L',
-                'class_id' => $classId,
-                'academic_year_id' => $yearId,
-                'status' => 'active',
-            ]);
-            $groupA?->members()->attach($s->id, ['joined_at' => now()->toDateString()]);
-        }
     }
 }

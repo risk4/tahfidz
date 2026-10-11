@@ -16,7 +16,6 @@ class DatabaseSeeder extends Seeder
             TahfidzGroupSeeder::class,
             StudentSeeder::class,
             QuranSeeder::class,
-            SubmissionMurajaahSeeder::class,
         ]);
     }
 }
