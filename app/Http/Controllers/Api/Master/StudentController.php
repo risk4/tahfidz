@@ -78,7 +78,19 @@ class StudentController extends Controller
 
         $perPage = min(max($request->integer('per_page', 20), 5), 100);
 
-        return $query->latest()->paginate($perPage);
+        // Statistik agregat atas seluruh data yang cocok filter (bukan hanya
+        // baris halaman aktif) supaya kartu ringkasan tetap akurat berapa pun
+        // ukuran halamannya. Setiap klona diberi kondisi tambahannya sendiri.
+        $statistics = [
+            'total' => (clone $query)->count(),
+            'active' => (clone $query)->where('status', 'active')->count(),
+            'male' => (clone $query)->where('gender', 'L')->count(),
+            'female' => (clone $query)->where('gender', 'P')->count(),
+        ];
+
+        $paginator = $query->latest()->paginate($perPage);
+
+        return response()->json(array_merge($paginator->toArray(), ['statistics' => $statistics]));
     }
 
     public function store(StoreStudentRequest $request)
