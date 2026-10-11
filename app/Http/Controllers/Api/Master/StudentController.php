@@ -182,10 +182,13 @@ class StudentController extends Controller
         $this->authorize('create', Student::class);
 
         $headers = $this->spreadsheetColumns();
+        // Contoh memakai nama kelas nyata bila tersedia. Kolom opsional
+        // (nik, phone, wali) sengaja dikosongkan agar jelas tidak wajib.
+        $exampleClass = ClassRoom::query()->orderBy('name')->value('name') ?? '7A';
         $example = [
-            'STR-001', 'Ahmad Fauzan', '12345', '1234567890', '3201234567890001', 'L',
-            'Jakarta', '2010-05-15', 'Jl. Contoh No. 1', '08123456789',
-            '1', '1', '2024', 'active',
+            'Ahmad Fauzan', '12345', '1234567890', '', 'L',
+            'Jakarta', '2010-05-15', 'Jl. Contoh No. 1', '',
+            $exampleClass, '2024', 'active',
             'Bapak Contoh', 'Ibu Contoh',
             '', '', '',
             '30', '1', 'Catatan contoh',
@@ -291,7 +294,13 @@ class StudentController extends Controller
         }
 
         $headerRow = array_map(fn ($h) => strtolower(trim((string) $h)), $headerRow);
-        $missing = array_diff(['student_code', 'name', 'gender', 'class_id', 'academic_year_id'], $headerRow);
+        // Wajib: name, gender, dan kelas (id atau nama). student_code dibuat
+        // otomatis oleh sistem; tahun ajaran default ke tahun ajaran aktif
+        // kecuali kolomnya disertakan.
+        $missing = array_diff(['name', 'gender'], $headerRow);
+        if (! in_array('class_id', $headerRow, true) && ! in_array('class_name', $headerRow, true)) {
+            $missing[] = 'class_name';
+        }
         if ($missing) {
             return response()->json(['message' => 'Kolom wajib tidak ditemukan: '.implode(', ', $missing)], 422);
         }
@@ -301,15 +310,14 @@ class StudentController extends Controller
         $mode = strtolower((string) $request->input('mode', 'update'));
         $mode = in_array($mode, ['update', 'insert_only'], true) ? $mode : 'update';
 
-        $classMap = ClassRoom::pluck('id', 'id')->toArray();
-        $academicYearMap = AcademicYear::pluck('id', 'id')->toArray();
+        $lookup = $this->buildImportLookup();
         $imported = 0;
         $skipped = [];
         $dirtyStudentIds = [];
 
         DB::beginTransaction();
         try {
-            $this->processImportRows($headerRow, $dataRows, $classMap, $academicYearMap, $mode, $imported, $skipped, $dirtyStudentIds);
+            $this->processImportRows($headerRow, $dataRows, $lookup, $mode, $imported, $skipped, $dirtyStudentIds);
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -332,7 +340,96 @@ class StudentController extends Controller
         ]);
     }
 
-    private function processImportRows(array $headerRow, array $dataRows, array $classMap, array $academicYearMap, string $mode, int &$imported, array &$skipped, array &$dirtyStudentIds): void
+    /**
+     * Bangun peta pencarian kelas & tahun ajaran, baik lewat id (angka)
+     * maupun nama (case-insensitive). Nama yang duplikat ditandai null agar
+     * tidak salah pilih — pencarian kelas juga dipersempit per tahun ajaran.
+     *
+     * @return array{classById: array<int, int>, classByName: array<string, int|null>, classByNameYear: array<string, int>, yearById: array<int, int>, yearByName: array<string, int|null>}
+     */
+    private function buildImportLookup(): array
+    {
+        $classById = [];
+        $classByName = [];
+        $classByNameYear = [];
+        foreach (ClassRoom::get(['id', 'name', 'academic_year_id']) as $class) {
+            $classById[$class->id] = $class->id;
+            $key = mb_strtolower(trim((string) $class->name));
+            $classByNameYear[$class->academic_year_id.'|'.$key] = $class->id;
+            // Simpan hanya bila nama belum pernah muncul (unik secara global).
+            $classByName[$key] = array_key_exists($key, $classByName) ? null : $class->id;
+        }
+
+        $yearById = [];
+        $yearByName = [];
+        foreach (AcademicYear::get(['id', 'name']) as $year) {
+            $yearById[$year->id] = $year->id;
+            $key = mb_strtolower(trim((string) $year->name));
+            $yearByName[$key] = array_key_exists($key, $yearByName) ? null : $year->id;
+        }
+
+        return [
+            'classById' => $classById,
+            'classByName' => $classByName,
+            'classByNameYear' => $classByNameYear,
+            'yearById' => $yearById,
+            'yearByName' => $yearByName,
+            'activeYearId' => AcademicYear::where('is_active', true)->orderBy('id')->value('id'),
+        ];
+    }
+
+    /** Tentukan id tahun ajaran dari kolom academic_year_id (angka) atau academic_year_name. */
+    private function resolveYearId(array $data, array $lookup): ?int
+    {
+        $raw = $data['academic_year_id'] ?? null;
+        if ($raw !== null && is_numeric($raw) && isset($lookup['yearById'][(int) $raw])) {
+            return (int) $raw;
+        }
+
+        // Nama bisa dari kolom academic_year_name, atau academic_year_id bila diisi teks.
+        $name = $data['academic_year_name'] ?? null;
+        if (($name === null || trim((string) $name) === '') && $raw !== null && ! is_numeric($raw)) {
+            $name = $raw;
+        }
+
+        if ($name !== null && trim((string) $name) !== '') {
+            return $lookup['yearByName'][mb_strtolower(trim((string) $name))] ?? null;
+        }
+
+        // Ada nilai tahun ajaran tapi tidak dikenali → jangan diam-diam
+        // pakai tahun aktif; biarkan baris ini dilewati dengan pesan jelas.
+        if ($raw !== null && trim((string) $raw) !== '') {
+            return null;
+        }
+
+        // Tidak ada info tahun ajaran → pakai tahun ajaran aktif.
+        return $lookup['activeYearId'] ?? null;
+    }
+
+    /** Tentukan id kelas dari kolom class_id (angka) atau class_name. */
+    private function resolveClassId(array $data, array $lookup, ?int $yearId): ?int
+    {
+        $raw = $data['class_id'] ?? null;
+        if ($raw !== null && is_numeric($raw) && isset($lookup['classById'][(int) $raw])) {
+            return (int) $raw;
+        }
+
+        // Nama bisa dari kolom class_name, atau class_id bila diisi teks.
+        $name = $data['class_name'] ?? null;
+        if (($name === null || trim((string) $name) === '') && $raw !== null && ! is_numeric($raw)) {
+            $name = $raw;
+        }
+        if ($name === null || trim((string) $name) === '') {
+            return null;
+        }
+
+        $key = mb_strtolower(trim((string) $name));
+
+        // Utamakan kecocokan dalam tahun ajaran yang sama, lalu nama unik global.
+        return $lookup['classByNameYear'][$yearId.'|'.$key] ?? $lookup['classByName'][$key] ?? null;
+    }
+
+    private function processImportRows(array $headerRow, array $dataRows, array $lookup, string $mode, int &$imported, array &$skipped, array &$dirtyStudentIds): void
     {
         // Baris 1 adalah header, sehingga baris data pertama bernomor 2.
         $rowNum = 1;
@@ -355,11 +452,9 @@ class StudentController extends Controller
             }
 
             $validator = Validator::make($data, [
-                'student_code' => ['required', 'string', 'max:30'],
+                'student_code' => ['nullable', 'string', 'max:30'],
                 'name' => ['required', 'string', 'max:150'],
                 'gender' => ['required', Rule::in(['L', 'P'])],
-                'class_id' => ['required', 'integer'],
-                'academic_year_id' => ['required', 'integer'],
                 'birth_date' => ['nullable', 'date'],
                 'entry_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
                 'status' => ['nullable', Rule::in(['active', 'inactive', 'graduated', 'transferred'])],
@@ -367,32 +462,48 @@ class StudentController extends Controller
                 'starting_juz' => ['nullable', 'integer', 'min:1', 'max:30'],
             ]);
 
+            $rowLabel = $data['student_code'] ?? $data['name'] ?? "(baris {$rowNum})";
+
             if ($validator->fails()) {
-                $skipped[] = ['row' => $rowNum, 'data' => $data['student_code'] ?? "(baris {$rowNum})", 'errors' => $validator->errors()->all()];
+                $skipped[] = ['row' => $rowNum, 'data' => $rowLabel, 'errors' => $validator->errors()->all()];
 
                 continue;
             }
 
-            $classId = (int) $data['class_id'];
-            $yearId = (int) $data['academic_year_id'];
-
-            if (! isset($classMap[$classId])) {
-                $skipped[] = ['row' => $rowNum, 'data' => $data['student_code'], 'errors' => ["class_id {$classId} tidak ditemukan."]];
-
-                continue;
-            }
-            if (! isset($academicYearMap[$yearId])) {
-                $skipped[] = ['row' => $rowNum, 'data' => $data['student_code'], 'errors' => ["academic_year_id {$yearId} tidak ditemukan."]];
+            // Resolusi tahun ajaran dulu (dipakai untuk mempersempit pencarian kelas).
+            $yearId = $this->resolveYearId($data, $lookup);
+            if ($yearId === null) {
+                $label = $data['academic_year_name'] ?? $data['academic_year_id'] ?? '(kosong)';
+                $skipped[] = ['row' => $rowNum, 'data' => $rowLabel, 'errors' => ["Tahun ajaran '{$label}' tidak ditemukan. Kosongkan kolomnya untuk memakai tahun ajaran aktif."]];
 
                 continue;
             }
 
-            $existing = Student::where('student_code', $data['student_code'])->first();
+            $classId = $this->resolveClassId($data, $lookup, $yearId);
+            if ($classId === null) {
+                $label = $data['class_name'] ?? $data['class_id'] ?? '(kosong)';
+                $skipped[] = ['row' => $rowNum, 'data' => $rowLabel, 'errors' => ["Kelas '{$label}' tidak ditemukan. Cek kolom class_name (samakan persis dengan nama kelas)."]];
+
+                continue;
+            }
+
+            // student_code opsional: bila diisi dipakai untuk mencocokkan data
+            // lama; bila kosong sistem membuat kode baru secara otomatis.
+            $studentCode = trim((string) ($data['student_code'] ?? ''));
+            $studentCode = $studentCode === '' ? null : $studentCode;
+
+            $existing = $studentCode !== null
+                ? Student::where('student_code', $studentCode)->first()
+                : null;
 
             if ($existing && $mode === 'insert_only') {
-                $skipped[] = ['row' => $rowNum, 'data' => $data['student_code'], 'errors' => ['student_code sudah ada (mode insert only).']];
+                $skipped[] = ['row' => $rowNum, 'data' => $rowLabel, 'errors' => ['student_code sudah ada (mode insert only).']];
 
                 continue;
+            }
+
+            if ($existing === null && $studentCode === null) {
+                $studentCode = $this->generateStudentCode();
             }
 
             // Hanya kolom yang terisi (non-null) yang ikut disimpan, agar
@@ -401,7 +512,7 @@ class StudentController extends Controller
             // ikut disimpan saat update). Gunakan ?? null agar CSV parsial
             // tidak memicu error "undefined array key".
             $values = array_filter([
-                'student_code' => $data['student_code'] ?? null,
+                'student_code' => $studentCode,
                 'name' => $data['name'] ?? null,
                 'gender' => $data['gender'] ?? null,
                 'nis' => $data['nis'] ?? null,
@@ -447,6 +558,32 @@ class StudentController extends Controller
         }
     }
 
+    /**
+     * Buat kode santri otomatis dengan format ST-<tahun><urut 4 digit>,
+     * mis. ST-20260001. Dipakai saat kolom student_code dikosongkan pada
+     * import. Nomor urut dicari dari kode terbesar yang sudah ada agar tidak
+     * bertabrakan, termasuk dengan kode yang baru dibuat pada batch ini.
+     */
+    private function generateStudentCode(): string
+    {
+        $prefix = 'ST-'.now()->format('Y');
+
+        $max = 0;
+        foreach (Student::where('student_code', 'like', $prefix.'%')->pluck('student_code') as $code) {
+            if (preg_match('/^'.preg_quote($prefix, '/').'(\d+)$/', (string) $code, $matches)) {
+                $max = max($max, (int) $matches[1]);
+            }
+        }
+
+        $next = $max + 1;
+        do {
+            $candidate = $prefix.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+            $next++;
+        } while (Student::where('student_code', $candidate)->exists());
+
+        return $candidate;
+    }
+
     private function tahfidzProfile(Student $student): array
     {
         $lastSubmission = $student->submissions()->with('surah')->latest('submission_date')->first();
@@ -483,10 +620,15 @@ class StudentController extends Controller
             ];
         }
 
+        // Template import: student_code dibuat otomatis oleh sistem, dan
+        // tahun ajaran otomatis memakai tahun ajaran aktif — keduanya tidak
+        // ditampilkan. Kolom nik, phone & wali tetap ada namun opsional.
+        // Import tetap menerima student_code/academic_year bila disertakan
+        // (mis. hasil export) demi kompatibilitas.
         return [
-            'student_code', 'name', 'nis', 'nisn', 'nik', 'gender',
+            'name', 'nis', 'nisn', 'nik', 'gender',
             'birth_place', 'birth_date', 'address', 'phone',
-            'class_id', 'academic_year_id', 'entry_year', 'status',
+            'class_name', 'entry_year', 'status',
             'father_name', 'mother_name',
             'guardian_name', 'guardian_phone', 'guardian_address',
             'memorization_target', 'starting_juz', 'notes',
