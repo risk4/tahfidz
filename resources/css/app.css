@@ -241,3 +241,30 @@
   }
 }
 
+/* ================================================================
+ * Panel modal — hanya bagian isi (formulir) yang bergulir.
+ * Header dan footer aksi selalu terlihat (layout flex kolom).
+ * Fallback 100vh + dukungan 100dvh (bilah URL browser seluler).
+ * ================================================================ */
+.modal-scroll-panel {
+  max-height: 100vh;
+}
+
+@supports (max-height: 100dvh) {
+  .modal-scroll-panel {
+    max-height: 100dvh;
+  }
+}
+
+@media (min-width: 640px) {
+  .modal-scroll-panel {
+    max-height: calc(100vh - 48px);
+  }
+
+  @supports (max-height: 100dvh) {
+    .modal-scroll-panel {
+      max-height: calc(100dvh - 48px);
+    }
+  }
+}
+
