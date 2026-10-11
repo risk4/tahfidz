@@ -723,3 +723,74 @@ export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
 }
+
+/* ================================================================
+ * Publik - "Lihat Hafalan" (cek hafalan santri via NISN, tanpa login)
+ * ================================================================ */
+
+export interface PublicHafalanChartPoint {
+  date: string;
+  label: string;
+  setoran: number;
+  setoran_pages: number;
+  murajaah: number;
+  murajaah_pages: number;
+}
+
+export interface PublicHafalanSurah {
+  surah_id: number;
+  surah_number: number;
+  name_latin: string;
+  name_arabic: string;
+  total_ayahs: number;
+  covered_ayahs: number;
+  progress_percentage: number;
+  average_score: number | null;
+  last_submission_at: string | null;
+}
+
+export interface PublicHafalanRecent {
+  submission_date: string | null;
+  surah_name: string | null;
+  start_ayah: number;
+  end_ayah: number;
+  type: string;
+  status: string;
+  final_score: number | null;
+}
+
+export interface PublicHafalanDetail {
+  found: true;
+  student: {
+    name: string;
+    gender: 'L' | 'P';
+    status: string;
+    entry_year: number | null;
+    class_name: string | null;
+    academic_year: string | null;
+  };
+  summary: {
+    total_juz_completed: number;
+    total_surah_completed: number;
+    total_ayah_covered: number;
+    progress_percentage: number;
+    average_score: number | null;
+    last_submission_at: string | null;
+    memorization_target: number | null;
+    starting_juz: number | null;
+  };
+  stats: {
+    total_setoran: number;
+    total_murajaah: number;
+    setoran_this_month: number;
+    murajaah_this_month: number;
+  };
+  chart: PublicHafalanChartPoint[];
+  surah_progress: PublicHafalanSurah[];
+  recent: PublicHafalanRecent[];
+}
+
+export type PublicHafalanResult =
+  | { status: 'found'; data: PublicHafalanDetail }
+  | { status: 'not_found'; message: string }
+  | { status: 'error'; message: string };

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { brandingService, getBrandingCache, applyFavicon } from "@/services/api";
+import HafalanSection from "@/components/landing/HafalanSection";
 import {
   Moon,
   Users,
@@ -13,7 +14,7 @@ import {
   BarChart3,
   Heart,
   Bell,
-  Play,
+  Search,
   ArrowRight,
   ArrowUp,
   Check,
@@ -40,6 +41,7 @@ const navLinks = [
   { label: "Beranda", href: "#beranda", active: true },
   { label: "Fitur", href: "#fitur" },
   { label: "Manfaat", href: "#manfaat" },
+  { label: "Hafalan", href: "#hafalan" },
   { label: "Testimoni", href: "#testimoni" },
   { label: "Kontak", href: "#kontak" },
 ];
@@ -481,9 +483,12 @@ function Hero() {
             >
               Mulai Sekarang <ArrowRight className="h-4 w-4" />
             </Link>
-            <button className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/20 active:scale-95">
-              <Play className="h-3.5 w-3.5" fill="currentColor" /> Lihat Demo
-            </button>
+            <a
+              href="#hafalan"
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/20 active:scale-95"
+            >
+              <Search className="h-3.5 w-3.5" /> Cek Hafalan
+            </a>
           </div>
 
           <div className="mt-10 flex flex-wrap gap-8 animate-fade-up [animation-delay:400ms]">
@@ -875,6 +880,9 @@ export default function Landing() {
       <Hero />
       <Features />
       <Benefits />
+      <Reveal>
+        <HafalanSection />
+      </Reveal>
       <Testimonials />
       <CTA />
       <Footer />

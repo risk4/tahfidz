@@ -17,6 +17,8 @@ import type {
   NotificationListResponse,
   PaginatedResponse,
   ProgressStats,
+  PublicHafalanDetail,
+  PublicHafalanResult,
   QuranStatistics,
   RecitationCheckPayload,
   SessionInfo,
@@ -1020,5 +1022,44 @@ export const brandingService = {
     // Terapkan favicon segera setelah fetch berhasil.
     applyFavicon(data.favicon_path);
     return data;
+  },
+};
+
+/**
+ * Endpoint publik "Lihat Hafalan" - mengecek perkembangan hafalan santri
+ * berdasarkan NISN tanpa autentikasi. Memakai axios biasa (bukan instance
+ * `api`) agar interceptor 401 tidak memicu redirect ke /login.
+ */
+export const hafalanService = {
+  async check(nisn: string): Promise<PublicHafalanResult> {
+    try {
+      const response = await axios.get('/api/hafalan/cek', { params: { nisn } });
+      return { status: 'found', data: response.data as PublicHafalanDetail };
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const payload = error.response?.data as
+          | { message?: string; errors?: Record<string, string[]> }
+          | undefined;
+        const status = error.response?.status;
+
+        if (status === 404) {
+          return {
+            status: 'not_found',
+            message: payload?.message ?? 'Data siswa dengan NISN tersebut tidak ditemukan.',
+          };
+        }
+        if (status === 429) {
+          return {
+            status: 'error',
+            message: 'Terlalu banyak permintaan. Mohon tunggu sebentar lalu coba lagi.',
+          };
+        }
+        if (status === 422) {
+          const first = Object.values(payload?.errors ?? {}).flat()[0];
+          return { status: 'error', message: first ?? 'NISN tidak valid.' };
+        }
+      }
+      return { status: 'error', message: 'Gagal memeriksa data. Silakan coba lagi.' };
+    }
   },
 };

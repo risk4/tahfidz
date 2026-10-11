@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\Settings\UpdateController;
 use App\Http\Controllers\Api\Tahfidz\CertificateController;
 use App\Http\Controllers\Api\Tahfidz\MurajaahController;
 use App\Http\Controllers\Api\Tahfidz\ProgressController;
+use App\Http\Controllers\Api\Tahfidz\PublicHafalanController;
 use App\Http\Controllers\Api\Tahfidz\RecitationCheckController;
 use App\Http\Controllers\Api\Tahfidz\SubmissionController;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,10 @@ Route::get('/branding', [SettingsController::class, 'branding'])
 
 // Verifikasi keaslian sertifikat via kode QR (halaman publik).
 Route::get('/certificates/verify/{verificationCode}', [CertificateController::class, 'verify'])
+    ->middleware('throttle:30,1');
+
+// Cek progres hafalan santri publik berdasarkan NISN (halaman landing).
+Route::get('/hafalan/cek', [PublicHafalanController::class, 'show'])
     ->middleware('throttle:30,1');
 
 // ===== AUTH =====
