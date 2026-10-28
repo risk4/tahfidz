@@ -32,15 +32,17 @@ import {
 
 const schema = z
   .object({
+    entry_mode: z.enum(['range', 'surah']),
     student_id: z.coerce.number().min(1, 'Santri wajib dipilih'),
     teacher_id: z.coerce.number().optional(),
     submission_date: z.string().min(1, 'Tanggal wajib diisi'),
     submission_time: z.string().min(1, 'Waktu wajib diisi'),
     type: z.enum(['new_memorization', 'repetition']),
     method: z.enum(['setoran', 'murojaah', 'tasmi', 'sambung_ayat']),
-    surah_id: z.coerce.number().min(1, 'Surah wajib dipilih'),
-    start_ayah: z.coerce.number().min(1, 'Ayat mulai wajib diisi'),
-    end_ayah: z.coerce.number().min(1, 'Ayat selesai wajib diisi'),
+    surah_id: z.coerce.number(),
+    start_ayah: z.coerce.number(),
+    end_ayah: z.coerce.number(),
+    surah_ids: z.array(z.coerce.number()),
     page_count: z.coerce.number().min(0.1, 'Jumlah halaman wajib diisi').max(999.9),
     status: z.enum(['pending', 'approved', 'revision', 'rejected']),
     fluency_score: z.coerce.number().min(0).max(100),
@@ -50,9 +52,24 @@ const schema = z
     notes: z.string().max(200, 'Catatan maksimal 200 karakter').optional(),
     audio_path: z.string().optional(),
   })
-  .refine((d) => d.end_ayah >= d.start_ayah, {
-    path: ['end_ayah'],
-    message: 'Ayat selesai tidak boleh lebih kecil dari ayat mulai',
+  .superRefine((d, ctx) => {
+    if (d.entry_mode === 'surah') {
+      if (d.surah_ids.length < 1) {
+        ctx.addIssue({ code: 'custom', path: ['surah_ids'], message: 'Pilih minimal satu surah' });
+      }
+      return;
+    }
+    if (d.surah_id < 1) {
+      ctx.addIssue({ code: 'custom', path: ['surah_id'], message: 'Surah wajib dipilih' });
+    }
+    if (d.start_ayah < 1) {
+      ctx.addIssue({ code: 'custom', path: ['start_ayah'], message: 'Ayat mulai wajib diisi' });
+    }
+    if (d.end_ayah < 1) {
+      ctx.addIssue({ code: 'custom', path: ['end_ayah'], message: 'Ayat selesai wajib diisi' });
+    } else if (d.start_ayah >= 1 && d.end_ayah < d.start_ayah) {
+      ctx.addIssue({ code: 'custom', path: ['end_ayah'], message: 'Ayat selesai tidak boleh lebih kecil dari ayat mulai' });
+    }
   });
 
 type FormData = z.infer<typeof schema>;
@@ -206,11 +223,13 @@ export function SubmissionDrawer({
     setValue,
     watch,
     reset,
+    clearErrors,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<z.input<typeof schema>, any, z.output<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: editing
       ? {
+          entry_mode: 'range' as const,
           student_id: editing.student_id,
           teacher_id: editing.teacher_id,
           submission_date: editing.submission_date ? toDateInputValue(editing.submission_date) : toDateInputValue(new Date()),
@@ -220,6 +239,7 @@ export function SubmissionDrawer({
           surah_id: editing.surah_id,
           start_ayah: editStartAyah,
           end_ayah: editEndAyah,
+          surah_ids: [] as number[],
           page_count: Number(editing.page_count || 1),
           status: editing.status || 'approved',
           fluency_score: editing.fluency_score || 90,
@@ -230,6 +250,7 @@ export function SubmissionDrawer({
           audio_path: editing.audio_path || '',
         }
       : {
+          entry_mode: 'range' as const,
           student_id: 0,
           teacher_id: currentTeacherId || undefined,
           submission_date: toDateInputValue(new Date()),
@@ -239,6 +260,7 @@ export function SubmissionDrawer({
           surah_id: 0,
           start_ayah: 1,
           end_ayah: 1,
+          surah_ids: [] as number[],
           page_count: 1,
           status: isAdmin ? 'approved' : 'pending',
           fluency_score: 90,
@@ -251,6 +273,39 @@ export function SubmissionDrawer({
   });
 
   const w = watch() as FormData;
+
+  // ===== Mode input: rentang ayat (default) vs beberapa surah utuh =====
+  const isSurahMode = w.entry_mode === 'surah';
+  const surahIds: number[] = (w.surah_ids ?? []).map(Number);
+  const selectedWholeSurahs = surahIds
+    .map((id) => surahs.find((s) => s.id === id))
+    .filter((s): s is QuranSurah => !!s);
+  const totalWholeAyahs = selectedWholeSurahs.reduce((sum, s) => sum + (Number(s.total_ayahs) || 0), 0);
+
+  const switchMode = (mode: 'range' | 'surah') => {
+    if (w.entry_mode === mode) return;
+    setValue('entry_mode', mode, { shouldDirty: true });
+    setServerError('');
+    if (mode === 'surah') {
+      clearErrors(['surah_id', 'start_ayah', 'end_ayah']);
+      // Surah yang sudah dipilih pada mode rentang ikut dibawa sebagai surah utuh.
+      if (surahIds.length === 0 && Number(w.surah_id) > 0) {
+        setValue('surah_ids', [Number(w.surah_id)], { shouldDirty: true });
+      }
+    } else {
+      clearErrors(['surah_ids']);
+    }
+  };
+
+  const addWholeSurah = (id: number) => {
+    if (!id || surahIds.includes(id)) return;
+    setValue('surah_ids', [...surahIds, id], { shouldDirty: true });
+    clearErrors('surah_ids');
+  };
+
+  const removeWholeSurah = (id: number) => {
+    setValue('surah_ids', surahIds.filter((s) => s !== id), { shouldDirty: true });
+  };
 
   // Hentikan audio saat surah diganti
   useEffect(() => {
@@ -356,30 +411,65 @@ export function SubmissionDrawer({
     data: s,
   }));
 
-  // Simpan
+  // Mode surah utuh — surah yang sudah dipilih disembunyikan dari picker.
+  const availableSurahOptions = surahOptions.filter((o) => !surahIds.includes(Number(o.value)));
+
+  // Simpan — satu setoran (mode rentang) atau sekaligus beberapa surah utuh.
+  const afterSaved = (message: string) => {
+    qc.invalidateQueries({ queryKey: ['submissions'] });
+    qc.invalidateQueries({ queryKey: ['dashboard-overview'] });
+    qc.invalidateQueries({ queryKey: ['students-options'] });
+    onSaved(message);
+    reset();
+    onClose();
+  };
+
+  const onMutationError = (e: unknown) => {
+    const err = e as { response?: { data?: { errors?: Record<string, string[]>; message?: string } } };
+    const errors = err?.response?.data?.errors;
+    if (errors && Object.keys(errors).length) {
+      setServerError(Object.values(errors)[0][0]);
+    } else {
+      setServerError(err?.response?.data?.message || 'Gagal menyimpan setoran. Periksa kembali isian form.');
+    }
+  };
+
   const save = useMutation({
     mutationFn: (d: FormData) =>
       editing ? submissionService.update(editing.id, d) : submissionService.create(d),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['submissions'] });
-      qc.invalidateQueries({ queryKey: ['dashboard-overview'] });
-      qc.invalidateQueries({ queryKey: ['students-options'] });
-      onSaved(editing ? 'Setoran berhasil diperbarui' : 'Setoran berhasil ditambahkan');
-      reset();
-      onClose();
-    },
-    onError: (e: unknown) => {
-      const err = e as { response?: { data?: { errors?: Record<string, string[]>; message?: string } } };
-      const errors = err?.response?.data?.errors;
-      if (errors && Object.keys(errors).length) {
-        setServerError(Object.values(errors)[0][0]);
-      } else {
-        setServerError(err?.response?.data?.message || 'Gagal menyimpan setoran. Periksa kembali isian form.');
-      }
-    },
+    onSuccess: () => afterSaved(editing ? 'Setoran berhasil diperbarui' : 'Setoran berhasil ditambahkan'),
+    onError: onMutationError,
   });
 
-  const onSubmit = handleSubmit((d) => save.mutate(d));
+  const saveMany = useMutation({
+    mutationFn: (d: FormData) =>
+      submissionService.createBatch({
+        student_id: Number(d.student_id),
+        teacher_id: d.teacher_id || undefined,
+        submission_date: d.submission_date,
+        submission_time: d.submission_time,
+        surah_ids: (d.surah_ids ?? []).map(Number),
+        page_count: d.page_count,
+        type: d.type,
+        method: d.method,
+        status: d.status,
+        fluency_score: Number(d.fluency_score),
+        tajwid_score: Number(d.tajwid_score),
+        makhraj_score: Number(d.makhraj_score),
+        fashahah_score: Number(d.fashahah_score),
+        notes: d.notes,
+        audio_path: d.audio_path,
+      }),
+    onSuccess: (res) => {
+      const count = Array.isArray(res?.data) ? res.data.length : 0;
+      afterSaved(count > 1 ? `${count} setoran berhasil ditambahkan` : 'Setoran berhasil ditambahkan');
+    },
+    onError: onMutationError,
+  });
+
+  const onSubmit = handleSubmit((d) =>
+    d.entry_mode === 'surah' ? saveMany.mutate(d) : save.mutate(d)
+  );
 
   // Tutup dengan konfirmasi bila ada perubahan
   const requestClose = () => {
@@ -513,7 +603,79 @@ export function SubmissionDrawer({
             <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-[#172033]">
               <BookOpen className="h-4 w-4 text-[#0D753F]" /> Informasi Hafalan
             </h3>
+
+            {/* Mode input — hanya untuk setoran baru */}
+            {!editing && (
+              <div className="mb-4 flex rounded-xl border border-[#E2E8F0] bg-slate-50 p-1" role="group" aria-label="Mode input setoran">
+                <button
+                  type="button"
+                  onClick={() => switchMode('range')}
+                  aria-pressed={!isSurahMode}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    !isSurahMode ? 'bg-white text-[#0D753F] shadow-sm' : 'text-[#64748B] hover:text-[#172033]'
+                  }`}
+                >
+                  Rentang Ayat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchMode('surah')}
+                  aria-pressed={isSurahMode}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    isSurahMode ? 'bg-white text-[#0D753F] shadow-sm' : 'text-[#64748B] hover:text-[#172033]'
+                  }`}
+                >
+                  Surah Utuh
+                </button>
+              </div>
+            )}
+
             <div className="grid gap-4 md:grid-cols-2">
+              {/* Mode surah utuh — satu atau beberapa surah sekaligus */}
+              {isSurahMode && (
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-sm font-medium text-[#172033]">
+                    Surah Utuh <span className="text-rose-500">*</span>
+                  </label>
+                  <SearchableSelect
+                    options={availableSurahOptions}
+                    value={null}
+                    onChange={(v) => addWholeSurah(Number(v))}
+                    placeholder="Tambah surah..."
+                    searchPlaceholder="Cari surah atau nomor..."
+                    emptyText="Semua surah sudah dipilih."
+                  />
+                  {surahIds.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedWholeSurahs.map((s) => (
+                        <span
+                          key={s.id}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-[#E8F5EE] px-3 py-1 text-xs font-bold text-[#0D753F]"
+                        >
+                          {s.name_latin}
+                          <span className="font-semibold text-[#0D753F]/70">· {s.total_ayahs} ayat</span>
+                          <button
+                            type="button"
+                            onClick={() => removeWholeSurah(s.id)}
+                            aria-label={`Hapus ${s.name_latin}`}
+                            className="grid h-4 w-4 place-items-center rounded-full bg-[#0D753F]/10 transition-colors hover:bg-[#0D753F]/25"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <p className="mt-1.5 text-xs text-[#94A3B8]">
+                    Setiap surah dicatat utuh dari ayat 1 sampai ayat terakhir.
+                  </p>
+                  {errors.surah_ids && (
+                    <p className="mt-1.5 text-xs text-rose-600">{errors.surah_ids.message}</p>
+                  )}
+                </div>
+              )}
+
+              {!isSurahMode && (
               <div className="md:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium text-[#172033]">
                   Surah <span className="text-rose-500">*</span>
@@ -536,7 +698,9 @@ export function SubmissionDrawer({
                 />
                 {errors.surah_id && <p className="mt-1.5 text-xs text-rose-600">{errors.surah_id.message}</p>}
               </div>
+              )}
 
+              {!isSurahMode && (
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-[#172033]">
                   Ayat Mulai <span className="text-rose-500">*</span>
@@ -569,6 +733,9 @@ export function SubmissionDrawer({
                 </div>
                 {errors.start_ayah && <p className="mt-1.5 text-xs text-rose-600">{errors.start_ayah.message}</p>}
               </div>
+              )}
+
+              {!isSurahMode && (
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-[#172033]">
                   Ayat Selesai <span className="text-rose-500">*</span>
@@ -599,6 +766,7 @@ export function SubmissionDrawer({
                 </div>
                 {errors.end_ayah && <p className="mt-1.5 text-xs text-rose-600">{errors.end_ayah.message}</p>}
               </div>
+              )}
 
               <div className="md:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium text-[#172033]">
@@ -619,19 +787,32 @@ export function SubmissionDrawer({
             </div>
 
             {/* Ringkasan hitungan */}
-            {selectedSurah && ayahCount > 0 && (
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#0D753F] px-3 py-1 text-xs font-bold text-white">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> {ayahCount} Ayat
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E8F5EE] px-3 py-1 text-xs font-semibold text-[#0D753F]">
-                  <Check className="h-3.5 w-3.5" /> {hafalCount} ditandai hafal
-                </span>
-              </div>
+            {isSurahMode ? (
+              selectedWholeSurahs.length > 0 && (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#0D753F] px-3 py-1 text-xs font-bold text-white">
+                    <BookOpen className="h-3.5 w-3.5" /> {selectedWholeSurahs.length} Surah
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E8F5EE] px-3 py-1 text-xs font-semibold text-[#0D753F]">
+                    <Check className="h-3.5 w-3.5" /> {totalWholeAyahs} Ayat
+                  </span>
+                </div>
+              )
+            ) : (
+              selectedSurah && ayahCount > 0 && (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#0D753F] px-3 py-1 text-xs font-bold text-white">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> {ayahCount} Ayat
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E8F5EE] px-3 py-1 text-xs font-semibold text-[#0D753F]">
+                    <Check className="h-3.5 w-3.5" /> {hafalCount} ditandai hafal
+                  </span>
+                </div>
+              )
             )}
 
             {/* Daftar ayat */}
-            {selectedSurah && (
+            {!isSurahMode && selectedSurah && (
               <div className="mt-4">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-xs font-bold uppercase tracking-wide text-[#64748B]">
@@ -843,16 +1024,17 @@ export function SubmissionDrawer({
           </Button>
           <Button
             onClick={onSubmit}
-            disabled={isSubmitting || save.isPending}
+            disabled={isSubmitting || save.isPending || saveMany.isPending}
             className="min-w-[150px] bg-[#0D753F] hover:bg-[#075B30]"
           >
-            {isSubmitting || save.isPending ? (
+            {isSubmitting || save.isPending || saveMany.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...
               </>
             ) : (
               <>
-                <CheckCircle2 className="mr-2 h-4 w-4" /> Simpan Setoran
+                <CheckCircle2 className="mr-2 h-4 w-4" />{' '}
+                {isSurahMode && surahIds.length > 1 ? `Simpan ${surahIds.length} Setoran` : 'Simpan Setoran'}
               </>
             )}
           </Button>

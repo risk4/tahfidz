@@ -492,6 +492,27 @@ export const submissionService = {
     return response.data;
   },
 
+  async createBatch(data: {
+    student_id: number;
+    teacher_id?: number;
+    submission_date: string;
+    submission_time?: string;
+    surah_ids: number[];
+    page_count?: number;
+    type: 'new_memorization' | 'repetition';
+    method?: 'setoran' | 'murojaah' | 'tasmi' | 'sambung_ayat';
+    status?: 'pending' | 'approved' | 'revision' | 'rejected';
+    fluency_score: number;
+    tajwid_score: number;
+    makhraj_score: number;
+    fashahah_score: number;
+    notes?: string;
+    audio_path?: string;
+  }) {
+    const response = await api.post('/submissions/batch', data);
+    return response.data;
+  },
+
   async update(id: number, data: {
     student_id: number;
     teacher_id?: number;

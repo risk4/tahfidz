@@ -87,6 +87,7 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
 
     // ===== SUBMISSION & MURAJAAH (STEP 3) =====
     Route::get('/submissions/export', [SubmissionController::class, 'export']);
+    Route::post('/submissions/batch', [SubmissionController::class, 'storeBatch']);
     Route::get('/murajaahs/export', [MurajaahController::class, 'export']);
     Route::apiResource('submissions', SubmissionController::class);
     Route::apiResource('murajaahs', MurajaahController::class);

@@ -9,6 +9,7 @@ use App\Domain\Quran\Models\QuranSurah;
 use App\Domain\Tahfidz\Models\Submission;
 use App\Domain\Tahfidz\Services\SubmissionService;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tahfidz\StoreSubmissionBatchRequest;
 use App\Http\Requests\Tahfidz\StoreSubmissionRequest;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -117,7 +118,7 @@ class SubmissionController extends Controller
 
         // Cegah duplikat: santri + tanggal + waktu yang sama.
         $duplicate = Submission::where('student_id', $data['student_id'])
-            ->where('submission_date', $data['submission_date'])
+            ->whereDate('submission_date', $data['submission_date'])
             ->when(! empty($data['submission_time']), fn ($q) => $q->where('submission_time', $data['submission_time']));
 
         if ($duplicate->exists()) {
@@ -129,6 +130,57 @@ class SubmissionController extends Controller
         $submission = $this->submissionService->create($data);
 
         return response()->json($submission, 201);
+    }
+
+    /**
+     * Simpan beberapa surah utuh sekaligus untuk satu santri — satu request,
+     * satu setoran per surah dengan rentang ayat 1..total_ayahs.
+     */
+    public function storeBatch(StoreSubmissionBatchRequest $request)
+    {
+        $data = $request->validated();
+
+        // Guru hanya boleh menginputkan untuk siswa yang ia bina.
+        if ($request->user()->isTeacher() && ! ($request->user()->teacher?->supervises((int) $data['student_id']) ?? false)) {
+            throw ValidationException::withMessages([
+                'student_id' => ['Anda hanya dapat membuat submission untuk siswa yang Anda bina.'],
+            ]);
+        }
+
+        // teacher_id & academic_year_id diisi otomatis dari konteks.
+        $data['teacher_id'] = $this->resolveTeacherId($request);
+        $data['academic_year_id'] = $this->resolveAcademicYearId();
+
+        // Mapping metode baru (setoran/murojaah/tasmi/sambung_ayat) ke kolom type legacy.
+        $data = $this->applyMethodMapping($data);
+
+        // Cegah duplikat: santri + tanggal + waktu yang sama (dicek sekali
+        // terhadap data yang sudah ada — baris dalam satu batch boleh sama waktu).
+        $duplicate = Submission::where('student_id', $data['student_id'])
+            ->whereDate('submission_date', $data['submission_date'])
+            ->when(! empty($data['submission_time']), fn ($q) => $q->where('submission_time', $data['submission_time']));
+
+        if ($duplicate->exists()) {
+            throw ValidationException::withMessages([
+                'submission_time' => ['Setoran untuk santri ini pada waktu tersebut sudah tersedia. Periksa kembali data setoran.'],
+            ]);
+        }
+
+        $surahIds = $data['surah_ids'];
+        unset($data['surah_ids']);
+
+        $totals = QuranSurah::whereIn('id', $surahIds)->pluck('total_ayahs', 'id');
+
+        $created = [];
+        foreach ($surahIds as $surahId) {
+            $created[] = $this->submissionService->create($data + [
+                'surah_id' => $surahId,
+                'start_ayah' => 1,
+                'end_ayah' => (int) $totals[$surahId],
+            ]);
+        }
+
+        return response()->json(['data' => $created], 201);
     }
 
     public function show(Request $request, Submission $submission)
